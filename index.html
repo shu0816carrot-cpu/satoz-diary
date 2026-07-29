@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Everyday Diary v13.2 Complete</title>
+    <title>Satoz Everyday Diary v13.2.1</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
-    <!-- 1. Firebase SDK (認証と完全同期用) -->
+    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -31,51 +31,57 @@
         window.cloud = {
             login: () => signInWithPopup(auth, provider),
             logout: () => signOut(auth),
-            // 全データを個人のフォルダに保存
             syncSave: async (uid, allData) => {
-                await setDoc(doc(db, "users", uid), { allData }, { merge: true });
+                try { await setDoc(doc(db, "users", uid), { allData, lastUpdate: Date.now() }, { merge: true }); } catch(e) { console.error("Save Error:", e); }
             },
-            // 全世界タイムラインへの投稿
             postGlobal: async (post) => {
-                await addDoc(collection(db, "global_posts"), { ...post, createdAt: Date.now() });
+                try { await addDoc(collection(db, "global_posts"), { ...post, createdAt: Date.now() }); } catch(e) { console.error("Post Error:", e); }
             }
         };
 
-        // ログイン状態の監視とデータ復元
         onAuthStateChanged(auth, async (user) => {
             const loginScreen = document.getElementById('login-screen');
             const appShell = document.getElementById('app-shell');
+            
             if (user) {
-                console.log("Syncing data for:", user.displayName);
-                const docSnap = await getDoc(doc(db, "users", user.uid));
-                if (docSnap.exists()) {
-                    // サーバーにデータがあれば、Ver11の変数を上書き
-                    window.db = docSnap.data().allData;
-                } else {
-                    // 初回のみGoogleの情報をセット
-                    window.db.user.name = user.displayName;
-                    window.db.user.avatar = user.photoURL;
+                try {
+                    const docSnap = await getDoc(doc(db, "users", user.uid));
+                    if (docSnap.exists() && docSnap.data().allData) {
+                        // サーバーからデータを復元。ただし構造を壊さないようにマージ
+                        const cloudData = docSnap.data().allData;
+                        window.db.records = cloudData.records || [];
+                        window.db.todos = cloudData.todos || [];
+                        window.db.user = { ...window.db.user, ...cloudData.user };
+                        window.db.cats = cloudData.cats || [];
+                        window.db.groups = cloudData.groups || [];
+                    }
+                    // Googleから情報を補完
+                    window.db.user.name = window.db.user.name || user.displayName;
+                    window.db.user.avatar = window.db.user.avatar || user.photoURL;
+                    window.db.user.id = user.uid;
+
+                    loginScreen.style.display = 'none';
+                    appShell.style.display = 'block';
+                    
+                    initApp(); // アプリ起動
+                    
+                    // タイムライン監視
+                    const q = query(collection(db, "global_posts"), orderBy("createdAt", "desc"), limit(30));
+                    onSnapshot(q, (snapshot) => {
+                        const posts = snapshot.docs.map(d => d.data());
+                        renderGlobalTimeline(posts);
+                    });
+                } catch (err) {
+                    console.error("Initialization Error:", err);
+                    alert("同期中にエラーが発生しました。リロードしてください。");
                 }
-                loginScreen.style.display = 'none';
-                appShell.style.display = 'block';
-                initApp(); // Ver 11.0の初期化実行
-                listenGlobalTimeline();
             } else {
                 loginScreen.style.display = 'flex';
                 appShell.style.display = 'none';
             }
         });
-
-        function listenGlobalTimeline() {
-            const q = query(collection(db, "global_posts"), orderBy("createdAt", "desc"), limit(30));
-            onSnapshot(q, (snapshot) => {
-                const posts = snapshot.docs.map(doc => doc.data());
-                renderGlobalTimeline(posts);
-            });
-        }
     </script>
 
-    <!-- 2. Ver 11.0 / 12.1 のデザインとライブラリ -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -85,13 +91,13 @@
         :root { --apple-bg: #f5f5f7; --apple-card: rgba(255, 255, 255, 0.85); --apple-text: #1d1d1f; --apple-accent: #0071e3; --glass: blur(25px) saturate(180%); }
         [data-theme="dark"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; }
         @media (prefers-color-scheme: dark) { [data-theme="auto"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; } }
-        body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, sans-serif; padding-bottom: 100px; transition: 0.3s; overflow-x: hidden; }
+        body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, sans-serif; padding-bottom: 110px; transition: 0.3s; overflow-x: hidden; }
         .glass-card { background: var(--apple-card); backdrop-filter: var(--glass); border-radius: 22px; border: 1px solid rgba(120, 120, 120, 0.1); }
         .view-section { display: none; }
         .view-section.active { display: block; animation: slideUp 0.4s ease-out; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 85px; background: var(--apple-card); backdrop-filter: blur(25px); border-top: 0.5px solid rgba(120,120,120,0.2); display: flex; align-items: center; z-index: 9999; }
-        .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 8px; font-weight: bold; background: none; border: none; }
+        .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 8px; font-weight: bold; background: none; }
         .nav-item.active { color: var(--apple-accent); }
         input, select, textarea { background: rgba(120,120,120,0.1); border: none; border-radius: 12px; padding: 12px; color: inherit; outline: none; }
         .todo-title { font-size: 15px; font-weight: 800; }
@@ -100,6 +106,8 @@
         .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
         .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
         .val-input { font-size: 14px; width: 60px; text-align: center; border-bottom: 1px solid var(--apple-accent); }
+        .chip { white-space: nowrap; font-size: 10px; font-weight: bold; padding: 6px 12px; border-radius: 20px; background: rgba(120,120,120,0.1); margin-right: 5px; }
+        .chip.active { background: var(--apple-accent); color: white; }
     </style>
 </head>
 <body>
@@ -107,14 +115,14 @@
     <!-- ログイン画面 -->
     <div id="login-screen" class="fixed inset-0 z-[10000] bg-white dark:bg-black flex flex-col items-center justify-center text-center p-10">
         <h1 class="text-5xl font-black text-blue-600 mb-2 italic">Satoz</h1>
-        <p class="text-gray-400 mb-10 font-bold tracking-widest">EVERYDAY DIARY</p>
+        <p class="text-gray-400 mb-10 font-bold tracking-widest uppercase">Everyday Diary</p>
         <div class="glass-card p-8 w-full max-w-xs shadow-2xl">
             <button onclick="window.cloud.login()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2">
                 <i class="bi bi-google"></i> Googleでログイン
             </button>
-            <p class="text-[9px] text-gray-400 mt-4 leading-relaxed">ログインすることで、スマホとPCで<br>同じデータを同期できます。</p>
+            <p class="text-[9px] text-gray-400 mt-4 leading-relaxed">全てのデバイスでデータを同期します。</p>
         </div>
-    </header>
+    </div>
 
     <!-- アプリ本体 -->
     <div id="app-shell" style="display: none;">
@@ -127,15 +135,14 @@
         </header>
 
         <main class="max-w-md mx-auto px-4">
-            
-            <!-- Home: 予定管理 -->
+            <!-- 1. ホーム -->
             <section id="home" class="view-section active">
                 <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400 shadow-sm">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="font-bold text-sm">予定管理 (今日・明日)</h2>
                         <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
                     </div>
-                    <div id="todo-display-list" class="space-y-4"></div>
+                    <div id="todo-display-list" class="space-y-4 text-xs"></div>
                 </div>
                 <div id="category-grid" class="grid grid-cols-4 gap-3 mb-6"></div>
                 <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
@@ -154,13 +161,13 @@
                 </div>
             </section>
 
-            <!-- タイムライン (Firebaseリアルタイム) -->
+            <!-- 2. タイムライン -->
             <section id="timeline" class="view-section">
                 <h2 class="text-xl font-black mb-6 italic text-blue-600">Global Timeline</h2>
                 <div id="feed-list" class="space-y-4"></div>
             </section>
 
-            <!-- 結果 (Ver 11.0完全復旧) -->
+            <!-- 3. 結果 -->
             <section id="results" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">Results</h2>
@@ -173,22 +180,42 @@
                 </div>
             </section>
 
-            <!-- 順位・本人・設定などのタブは内部ロジックでVer 11を完全再現 -->
-            <section id="ranking" class="view-section"><h2 class="text-xl font-black italic mb-6">Rankings</h2><div id="ranking-display" class="glass-card overflow-hidden"></div></section>
-            
-            <section id="profile" class="view-section">
-                <div id="profile-header-area"></div>
-                <div class="glass-card p-6 mb-6 text-center"><h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Time Allocation</h3><canvas id="profilePieChart"></canvas></div>
-                <div class="glass-card p-6 mb-6 text-center"><h3 class="text-[10px] font-bold text-gray-400 uppercase mb-4">Weekly Stats</h3><canvas id="profileBarChart"></canvas></div>
+            <!-- 4. 順位 -->
+            <section id="ranking" class="view-section">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-black italic">Rankings</h2>
+                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
+                </div>
+                <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
+                <div id="ranking-display" class="glass-card overflow-hidden"></div>
             </section>
 
+            <!-- 5. 本人 -->
+            <section id="profile" class="view-section">
+                <div id="profile-header-area"></div>
+                <div class="glass-card p-6 mb-6 text-center">
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Time Allocation</h3>
+                    <canvas id="profilePieChart"></canvas>
+                </div>
+                <div class="glass-card p-6 mb-6 text-center">
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-4">Weekly Statistics</h3>
+                    <canvas id="profileBarChart"></canvas>
+                </div>
+            </section>
+
+            <!-- 設定 -->
             <section id="settings" class="view-section">
-                <h2 class="text-xl font-bold mb-6">Settings</h2>
+                <h2 class="text-xl font-bold mb-6 text-center">Settings</h2>
                 <div class="glass-card p-5 space-y-4">
-                    <input type="text" id="set-name" placeholder="名前"><input type="text" id="set-id" placeholder="ユーザーID">
+                    <div class="flex flex-col items-center gap-2">
+                        <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
+                        <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
+                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="handleFile(event)">
+                    </div>
+                    <input type="text" id="set-name" placeholder="名前">
+                    <input type="text" id="set-id" placeholder="ユーザーID">
                     <div class="grid grid-cols-3 gap-2"><input type="number" id="set-weight" placeholder="体重"><input type="number" id="set-height" placeholder="身長"><input type="number" id="set-age" placeholder="年齢"></div>
-                    <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">クラウドへ保存</button>
-                    <button onclick="window.cloud.logout()" class="w-full text-red-500 text-xs font-bold py-2 mt-4">ログアウト</button>
+                    <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">設定を同期保存</button>
                 </div>
             </section>
         </main>
@@ -203,27 +230,32 @@
     </div>
 
     <script>
-        // --- データ管理ロジック (Ver 11.0 全復旧) ---
+        // --- データ管理エンジン (Ver 11.0のロジックを完全保持) ---
         window.db = JSON.parse(localStorage.getItem('sz_v11_db') || '{"user":{"name":"Guest","id":"","avatar":null,"weight":65,"height":170,"age":20},"records":[],"todos":[],"cats":[],"groups":[]}');
         
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
+            { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
             { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0 },
+            { id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0 },
             { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
+            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
             { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
         ];
 
-        let currentCatId = '';
+        let currentCatId = '', rankCatId = 'study', charts = {};
 
         function initApp() {
             renderCategories();
             renderAll();
             renderResultsView();
+            renderRankFilters();
             setInterval(() => document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('ja-JP'), 1000);
         }
 
+        // --- 記録・UI・計算ロジック (Ver 11.0より復元) ---
         function renderCategories() {
-            document.getElementById('category-grid').innerHTML = baseCats.map(c => `<button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center active:scale-90 transition"><i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i><span class="text-[9px] font-bold">${c.name}</span></button>`).join('');
+            document.getElementById('category-grid').innerHTML = baseCats.map(c => `<button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center active:scale-95 transition"><i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i><span class="text-[9px] font-bold">${c.name}</span></button>`).join('');
         }
 
         function openInput(id) {
@@ -237,12 +269,12 @@
             const calView = document.getElementById('calorie-preview');
             fields.innerHTML = ''; calView.classList.add('hidden');
 
-            if(id === 'study' || id === 'run') {
+            if(id === 'study' || id === 'run' || id === 'exercise') {
                 if(id==='run') fields.innerHTML = `<input type="number" id="v_dist" placeholder="距離(km)" class="w-full mb-2" oninput="updatePreCal()">`;
                 fields.innerHTML += `<div class="flex gap-2 justify-center items-center"><input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span><input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span></div>`;
                 calView.classList.remove('hidden');
             } else if(id === 'sleep') {
-                fields.innerHTML = `<div class="grid grid-cols-2 gap-2"><div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}"></div><div>時刻<input type="time" id="sleep_s_time" value="23:00"></div><div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}"></div><div>時刻<input type="time" id="sleep_e_time" value="07:00"></div></div>`;
+                fields.innerHTML = `<div class="grid grid-cols-2 gap-2 text-[10px] font-bold"><div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}"></div><div>時刻<input type="time" id="sleep_s_time" value="23:00"></div><div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}"></div><div>時刻<input type="time" id="sleep_e_time" value="07:00"></div></div>`;
             } else if(id === 'schedule') {
                 fields.innerHTML = `<select id="todo-date-sel" class="w-full mb-2"><option value="today">今日</option><option value="tomorrow">明日</option></select><input type="text" id="v_task_todo" placeholder="予定内容">`;
             } else {
@@ -270,20 +302,21 @@
                 const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate()+1)).toISOString().split('T')[0];
                 window.db.todos.push({ id:Date.now(), time, task, memo, done:false, date:targetDate });
             } else {
-                if(currentCatId === 'study' || currentCatId === 'run') {
+                if(cat.type === 'time' || cat.type === 'run' || currentCatId === 'exercise') {
                     val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
                 } else if(currentCatId === 'sleep') {
                     const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
                     const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
                     val = (e - s) / 3600000; if(val < 0) val += 24;
-                } else { val = parseFloat(document.getElementById('v1')?.value || 0); }
+                } else if(currentCatId === 'diary') { val = memo.length; }
+                else { val = parseFloat(document.getElementById('v1')?.value || 0); }
                 
                 if(currentCatId === 'weight') window.db.user.weight = val;
                 
                 const post = { userName: window.db.user.name, catName: cat.name, valDisp: val.toFixed(1) + cat.unit, comment: memo, date, time };
                 window.db.records.unshift({ id:Date.now(), ...post, val, catId:currentCatId });
                 // サーバー投稿
-                await window.cloud.postGlobal(post);
+                if(window.cloud) await window.cloud.postGlobal(post);
             }
             saveAndSync();
             closeInput();
@@ -301,15 +334,7 @@
                 const diffH = (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
                 return `<div class="glass-card p-3 text-center"><p class="text-[8px] font-bold opacity-50 uppercase">${c.name}</p><p class="text-sm font-black text-blue-600">${cur.toFixed(1)}${c.unit}</p>${diffH}</div>`;
             }).join('');
-        }
-
-        function renderGlobalTimeline(posts) {
-            document.getElementById('feed-list').innerHTML = posts.map(p => `
-                <div class="glass-card p-4 text-left shadow-sm">
-                    <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName}・${p.userName}</p>
-                    <p class="todo-title">${p.valDisp}</p>
-                    <p class="text-[11px] opacity-80 mt-1">${p.comment || ''}</p>
-                </div>`).join('');
+            document.getElementById('result-todo-list').innerHTML = window.db.todos.filter(t=>t.date===date && t.done).map(t => `<div class="p-2 bg-green-50 text-[10px] rounded-lg">✓ ${t.task}</div>`).join('');
         }
 
         function renderAll() {
@@ -317,30 +342,34 @@
             const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
             document.getElementById('todo-display-list').innerHTML = `
                 <p class="text-[10px] font-bold text-gray-400">TODAY</p>
-                ${window.db.todos.filter(t=>t.date===today).map(t => `<div class="flex items-start gap-3 p-3 bg-white/40 rounded-xl shadow-sm"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${t.id})"> <div><p class="todo-title ${t.done?'todo-checked':''}">${t.task}</p><p class="todo-memo">${t.memo||''}</p></div></div>`).join('') || '<p class="text-center text-xs opacity-30">予定なし</p>'}
+                ${window.db.todos.filter(t=>t.date===today).map(t => `<div class="flex items-start gap-3 p-3 bg-white/40 rounded-xl shadow-sm"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${t.id})"> <div><p class="todo-title ${t.done?'todo-checked':''}">${t.task}</p><p class="todo-memo">${t.memo||''}</p></div></div>`).join('') || '<p class="text-center opacity-30">なし</p>'}
                 <p class="text-[10px] font-bold text-gray-400 mt-4">TOMORROW</p>
-                ${window.db.todos.filter(t=>t.date===tomorrow).map(t => `<div class="p-3 bg-white/10 rounded-xl opacity-60"><p class="todo-title">${t.task}</p></div>`).join('') || '<p class="text-center text-xs opacity-30">予定なし</p>'}
+                ${window.db.todos.filter(t=>t.date===tomorrow).map(t => `<div class="p-3 bg-white/10 rounded-xl opacity-60"><p class="todo-title">${t.task}</p></div>`).join('') || '<p class="text-center opacity-30">なし</p>'}
             `;
         }
 
+        // --- Firebase/同期ヘルパー ---
         function saveAndSync() {
             localStorage.setItem('sz_v11_db', JSON.stringify(window.db));
-            const authUser = window.auth.currentUser;
-            if(authUser) window.cloud.syncSave(authUser.uid, window.db);
+            if(window.auth?.currentUser) window.cloud.syncSave(window.auth.currentUser.uid, window.db);
             renderAll(); renderResultsView();
+        }
+        function renderGlobalTimeline(posts) {
+            const list = document.getElementById('feed-list');
+            list.innerHTML = posts.map(p => `<div class="glass-card p-4 text-left shadow-sm"><p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName}・${p.userName}</p><p class="todo-title">${p.valDisp}</p><p class="text-[11px] opacity-80 mt-1">${p.comment || ''}</p></div>`).join('');
         }
         function toggleTodo(id) { const t=window.db.todos.find(x=>x.id===id); t.done=!t.done; saveAndSync(); }
         function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
-        function showSection(id) { document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); event && event.currentTarget.classList.add('active'); renderAll(); renderResultsView(); }
-        function saveSettings() {
-            window.db.user.name = document.getElementById('set-name').value;
-            window.db.user.id = document.getElementById('set-id').value;
-            window.db.user.weight = parseFloat(document.getElementById('set-weight').value);
-            saveAndSync(); alert("保存完了");
+        function showSection(id) { document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); if(event) event.currentTarget.classList.add('active'); renderAll(); renderResultsView(); if(id==='profile') renderProfilePage(); }
+        function renderProfilePage() {
+            const u = window.db.user;
+            document.getElementById('profile-header-area').innerHTML = `<div class="glass-card p-6 mb-6 flex flex-col items-center"><img src="${u.avatar || 'https://ui-avatars.com/api/?name='+u.name}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover"><h2 class="text-xl font-black mt-4">${u.name}</h2><p class="text-[10px] text-gray-400">@${u.id || 'id'}</p></div>`;
         }
-        function handleFile(e) {
-            const r = new FileReader(); r.onload=(ev)=>{ window.db.user.avatar=ev.target.result; document.getElementById('set-avatar-preview').src=ev.target.result; }; r.readAsDataURL(e.target.files[0]);
-        }
+        function saveSettings() { window.db.user.name=document.getElementById('set-name').value; window.db.user.id=document.getElementById('set-id').value; window.db.user.weight=parseFloat(document.getElementById('set-weight').value); saveAndSync(); alert("保存完了"); }
+        function handleFile(e) { const r = new FileReader(); r.onload=(ev)=>{ window.db.user.avatar=ev.target.result; document.getElementById('set-avatar-preview').src=ev.target.result; }; r.readAsDataURL(e.target.files[0]); }
+        function renderRankFilters() { document.getElementById('rank-filters').innerHTML=baseCats.filter(c=>c.type!=='todo').map(c=>`<button onclick="updateRankList('${c.id}')" class="chip ${rankCatId===c.id?'active':''}">${c.name}</button>`).join(''); }
+        function updateRankList(id) { rankCatId=id; renderRankFilters(); const myV=window.db.records.filter(r=>r.catId===id).reduce((s,a)=>s+a.val,0); document.getElementById('ranking-display').innerHTML=`<div class="flex items-center p-4 bg-white/50"><span class="w-8 font-black text-yellow-500">1</span><span class="flex-1 font-bold text-sm">あなた</span><span class="font-black text-blue-600 text-xs">${myV.toFixed(1)}</span></div>`; }
+        function toggleNotifs() { document.getElementById('notif-dropdown').classList.toggle('hidden'); }
     </script>
 </body>
 </html>
