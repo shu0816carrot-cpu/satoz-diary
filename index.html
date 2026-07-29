@@ -148,202 +148,208 @@
     </div>
 
     <script>
-        // --- データ管理エンジン ---
-        window.dbData = {
-            user: { name: "", id: "", avatar: null, weight: 65, height: 170, age: 20 },
-            records: [],
-            todos: [],
-            cats: []
-        };
+    // --- 1. データ管理エンジン ---
+    window.dbData = JSON.parse(localStorage.getItem('sz_v13_db')) || {
+        user: { name: "", id: "", avatar: null, weight: 65, height: 170, age: 20 },
+        records: [],
+        todos: [],
+        cats: []
+    };
 
-        // 既存の baseCats をこれに書き換えてください
-const baseCats = [
-    { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
-    { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
-    { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0 },
-    { id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0 },
-    { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
-    { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
-    { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
-];
-        
-        function formatTime(h) {
-    const hr = Math.floor(h);
-    const mn = Math.round((h - hr) * 60);
-    return hr > 0 ? `${hr}時間${mn}分` : `${mn}分`;
-}
-        
-        function initApp() {
-            renderCategories();
-            renderAll();
-            setInterval(() => {
-                document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('ja-JP');
-            }, 1000);
-        }
+    const baseCats = [
+        { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
+        { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
+        { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0 },
+        { id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0 },
+        { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
+        { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
+        { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
+    ];
 
-        function renderCategories() {
-            const grid = document.getElementById('category-grid');
-            grid.innerHTML = baseCats.map(c => `<button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center"><i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i><span class="text-[9px] font-bold">${c.name}</span></button>`).join('');
-        }
-
-        function openInput(id) {
-    window.currentCatId = id;
-    const cat = [...baseCats, ...window.dbData.cats].find(c => c.id === id);
-    document.getElementById('input-area').classList.remove('hidden');
-    document.getElementById('input-title').innerText = cat ? cat.name : "予定";
-    
-    // 日時の初期化
-    document.getElementById('rec-date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('rec-time').value = new Date().toTimeString().slice(0,5);
-
-    const fields = document.getElementById('dynamic-fields');
-    const calView = document.getElementById('calorie-preview');
-    fields.innerHTML = ''; calView.classList.add('hidden');
-
-    if(id === 'study' || id === 'exercise' || id === 'run') {
-        // 時・分入力UI
-        if(id === 'run') fields.innerHTML = `<input type="number" id="v_dist" placeholder="距離(km)" class="w-full mb-2" oninput="updatePreCal()">`;
-        fields.innerHTML += `
-            <div class="flex gap-2 justify-center items-center">
-                <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
-                <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
-            </div>`;
-        calView.classList.remove('hidden');
-    } else if(id === 'sleep') {
-        // 睡眠用カレンダーUI
-        fields.innerHTML = `
-            <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
-                <div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}"></div>
-                <div>時刻<input type="time" id="sleep_s_time" value="23:00"></div>
-                <div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}"></div>
-                <div>時刻<input type="time" id="sleep_e_time" value="07:00"></div>
-            </div>`;
-    } else if(id === 'schedule') {
-        // 予定用UI
-        fields.innerHTML = `
-            <select id="todo-date-sel" class="w-full mb-2"><option value="today">今日</option><option value="tomorrow">明日</option></select>
-            <input type="text" id="v_task_todo" placeholder="予定内容">`;
-    } else {
-        // その他（体重・食事など）
-        fields.innerHTML = `<input type="number" id="v1" placeholder="${cat ? cat.unit : ''}を入力" class="w-full">`;
+    // --- 2. 初期化と描画 ---
+    function initApp() {
+        renderCategories();
+        renderAll();
+        renderResultsView();
+        setInterval(() => {
+            const clock = document.getElementById('realtime-clock');
+            if(clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
+        }, 1000);
     }
-}
 
-        function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
-
-        function updatePreCal() {
-    const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
-    const m = parseFloat(document.getElementById('v_mins')?.value || 0);
-    const dist = parseFloat(document.getElementById('v_dist')?.value || 0);
-    const totalH = h + (m / 60);
-    
-    const cat = baseCats.find(c => c.id === window.currentCatId);
-    if (cat && document.getElementById('cal-val')) {
-        // 体重をもとにカロリー計算 (Ver 11.0のロジック)
-        const burn = Math.round(cat.mets * window.dbData.user.weight * totalH * 1.05);
-        document.getElementById('cal-val').innerText = burn;
+    function renderCategories() {
+        const grid = document.getElementById('category-grid');
+        if(!grid) return;
+        grid.innerHTML = baseCats.map(c => `
+            <button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center active:scale-95 transition">
+                <i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i>
+                <span class="text-[9px] font-bold">${c.name}</span>
+            </button>
+        `).join('');
     }
-}
 
-        async function saveRecord() {
-    const memo = document.getElementById('rec-comment').value.trim();
-    const date = document.getElementById('rec-date').value;
-    const time = document.getElementById('rec-time').value;
-    let val = 0;
-    const cat = [...baseCats, ...window.dbData.cats].find(c => c.id === window.currentCatId);
+    function openInput(id) {
+        window.currentCatId = id;
+        const cat = baseCats.find(c => c.id === id);
+        document.getElementById('input-area').classList.remove('hidden');
+        document.getElementById('input-title').innerText = cat ? cat.name : "予定";
+        
+        document.getElementById('rec-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('rec-time').value = new Date().toTimeString().slice(0,5);
 
-    if(window.currentCatId === 'schedule') {
-        const task = document.getElementById('v_task_todo').value;
-        if(!task) return;
-        const sel = document.getElementById('todo-date-sel').value;
-        const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate()+1)).toISOString().split('T')[0];
-        window.dbData.todos.push({ id:Date.now(), time, task, memo, done:false, date:targetDate });
-    } else {
-        // 数値・時間の計算
-        if(cat.type === 'time' || cat.type === 'run') {
-            val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
-        } else if(window.currentCatId === 'sleep') {
-            const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
-            const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
-            val = (e - s) / 3600000; if(val < 0) val += 24;
-        } else if(window.currentCatId === 'diary') {
-            val = memo.length;
+        const fields = document.getElementById('dynamic-fields');
+        const calView = document.getElementById('calorie-preview');
+        fields.innerHTML = ''; 
+        if(calView) calView.classList.add('hidden');
+
+        if(id === 'study' || id === 'exercise' || id === 'run') {
+            if(id === 'run') fields.innerHTML = `<input type="number" id="v_dist" placeholder="距離(km)" class="w-full mb-2" oninput="updatePreCal()">`;
+            fields.innerHTML += `
+                <div class="flex gap-2 justify-center items-center">
+                    <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
+                    <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
+                </div>`;
+            if(calView) calView.classList.remove('hidden');
+        } else if(id === 'sleep') {
+            fields.innerHTML = `
+                <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
+                    <div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}"></div>
+                    <div>時刻<input type="time" id="sleep_s_time" value="23:00"></div>
+                    <div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}"></div>
+                    <div>時刻<input type="time" id="sleep_e_time" value="07:00"></div>
+                </div>`;
+        } else if(id === 'schedule') {
+            fields.innerHTML = `
+                <select id="todo-date-sel" class="w-full mb-2"><option value="today">今日</option><option value="tomorrow">明日</option></select>
+                <input type="text" id="v_task_todo" placeholder="予定内容">`;
         } else {
-            val = parseFloat(document.getElementById('v1')?.value || 0);
+            fields.innerHTML = `<input type="number" id="v1" placeholder="${cat ? cat.unit : ''}を入力" class="w-full">`;
         }
-        
-        if(window.currentCatId === 'weight') window.dbData.user.weight = val;
-
-        const post = { userName: window.dbData.user.name, catName: cat.name, valDisp: val.toFixed(1) + (cat.unit || ""), comment: memo, date, time };
-        window.dbData.records.unshift({ id:Date.now(), ...post, val, catId:window.currentCatId });
-
-        // Firebaseに投稿データを送信
-        if (window.cloud && window.cloud.postTimeline) await window.cloud.postTimeline(post);
     }
 
-    // 自分の個人データ全体をFirebaseに保存（同期）
-    if (window.cloud && window.cloud.saveAllData) {
-        await window.cloud.saveAllData(window.dbData.user.id, window.dbData);
+    function updatePreCal() {
+        const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
+        const m = parseFloat(document.getElementById('v_mins')?.value || 0);
+        const cat = baseCats.find(c => c.id === window.currentCatId);
+        const calDisp = document.getElementById('cal-val');
+        if(cat && calDisp) {
+            const burn = Math.round(cat.mets * window.dbData.user.weight * (h + m/60) * 1.05);
+            calDisp.innerText = burn;
+        }
     }
-    
-    closeInput();
-    renderAll();
-    renderResultsView();
-}
-    
 
-function renderResultsView() {
-    const resDateInput = document.getElementById('results-date');
-    if (!resDateInput) return;
+    // --- 3. 保存と同期 ---
+    async function saveRecord() {
+        const memo = document.getElementById('rec-comment').value.trim();
+        const date = document.getElementById('rec-date').value;
+        const time = document.getElementById('rec-time').value;
+        let val = 0;
+        const cat = baseCats.find(c => c.id === window.currentCatId);
 
-    const date = resDateInput.value;
-    
-    document.getElementById('result-sum-grid').innerHTML = baseCats.map(c => {
-        const curRecs = window.dbData.records.filter(r=>r.date===date && r.catId===c.id);
-        const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s,a)=>s+a.val,0);
-        const old = window.dbData.records.filter(r=>r.date===prev && r.catId===c.id).reduce((s,a)=>s+a.val,0);
-        const diff = cur - old;
+        if(window.currentCatId === 'schedule') {
+            const task = document.getElementById('v_task_todo').value;
+            if(!task) return;
+            const sel = document.getElementById('todo-date-sel').value;
+            const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate()+1)).toISOString().split('T')[0];
+            window.dbData.todos.push({ id:Date.now(), time, task, memo, done:false, date:targetDate });
+        } else {
+            if(cat.type === 'time' || cat.type === 'run') {
+                val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
+            } else if(window.currentCatId === 'sleep') {
+                const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
+                const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
+                val = (e - s) / 3600000; if(val < 0) val += 24;
+            } else if(window.currentCatId === 'diary') {
+                val = memo.length;
+            } else {
+                val = parseFloat(document.getElementById('v1')?.value || 0);
+            }
+            if(window.currentCatId === 'weight') window.dbData.user.weight = val;
+
+            const post = { userName: window.dbData.user.name, catName: cat.name, valDisp: val.toFixed(1) + (cat.unit || ""), comment: memo, date, time };
+            window.dbData.records.unshift({ id:Date.now(), ...post, val, catId:window.currentCatId });
+
+            if (window.cloud && window.cloud.postTimeline) await window.cloud.postTimeline(post);
+        }
+
+        if (window.cloud && window.cloud.saveAllData) {
+            await window.cloud.saveAllData(window.dbData.user.id, window.dbData);
+        }
+
+        closeInput();
+        renderAll();
+        renderResultsView();
+        alert("同期しました");
+    }
+
+    function renderResultsView() {
+        const resInput = document.getElementById('results-date');
+        if(!resInput) return;
+        const date = resInput.value;
+        const prev = new Date(new Date(date).setDate(new Date(date).getDate()-1)).toISOString().split('T')[0];
         
-        if(cur === 0) return '';
-        const diffH = (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
-        let valDisp = (c.type==='time' || c.id==='sleep') ? formatTime(cur) : `${cur.toFixed(1)}${c.unit}`;
-        
-        return `<div class="glass-card p-3 text-center"><p class="text-[8px] font-bold opacity-50 uppercase">${c.name}</p><p class="text-sm font-black text-blue-600">${valDisp}</p>${diffH}</div>`;
-    }).join('');
-}
+        document.getElementById('result-sum-grid').innerHTML = baseCats.map(c => {
+            const curRecs = window.dbData.records.filter(r=>r.date===date && r.catId===c.id);
+            const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s,a)=>s+a.val,0);
+            const old = window.dbData.records.filter(r=>r.date===prev && r.catId===c.id).reduce((s,a)=>s+a.val,0);
+            const diff = cur - old;
+            
+            if(cur === 0) return '';
+            const diffH = (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
+            let valDisp = (c.type==='time' || c.id==='sleep') ? formatTime(cur) : `${cur.toFixed(1)}${c.unit}`;
+            
+            return `<div class="glass-card p-3 text-center"><p class="text-[8px] font-bold opacity-50 uppercase">${c.name}</p><p class="text-sm font-black text-blue-600">${valDisp}</p>${diffH}</div>`;
+        }).join('');
+    }
 
-    closeInput();
-    renderAll();
-    renderResultsView();
-}
-        function renderTimeline(posts) {
-            const list = document.getElementById('feed-list');
-            list.innerHTML = posts.map(p => `
-                <div class="glass-card p-4">
-                    <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catId}・${p.userName}</p>
-                    <p class="text-sm font-bold">${p.val} ${p.comment}</p>
-                    <p class="text-[8px] text-gray-400 mt-1">${p.date} ${p.time}</p>
+    function renderTimeline(posts) {
+        const list = document.getElementById('feed-list');
+        if(!list) return;
+        list.innerHTML = posts.map(p => `
+            <div class="glass-card p-4 text-left shadow-sm">
+                <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName}・${p.userName}</p>
+                <p class="todo-title">${p.valDisp}</p>
+                <p class="text-[11px] opacity-80 mt-1">${p.comment || ''}</p>
+                <p class="text-[8px] text-gray-400 mt-2">${p.date} ${p.time}</p>
+            </div>`).join('');
+    }
+
+    function renderAll() {
+        const d = new Date().toISOString().split('T')[0];
+        const list = document.getElementById('todo-display-list');
+        if(list) {
+            list.innerHTML = window.dbData.todos.filter(t=>t.date===d).map(t => `
+                <div class="flex gap-2 text-xs">
+                    <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${t.id})">
+                    <b>${t.time}</b> ${t.task}
                 </div>`).join('');
         }
+    }
 
-        function renderAll() {
-            const d = new Date().toISOString().split('T')[0];
-            document.getElementById('todo-display-list').innerHTML = window.dbData.todos.filter(t=>t.date===d).map(t => `<div class="flex gap-2 text-xs"><input type="checkbox"> <b>${t.time}</b> ${t.task}</div>`).join('');
-        }
+    function formatTime(decimalHrs) {
+        const h = Math.floor(decimalHrs);
+        const m = Math.round((decimalHrs - h) * 60);
+        return h > 0 ? `${h}h${m}m` : `${m}m`;
+    }
 
-        // 時間を「○時間○分」の見た目にする
-        function formatTime(decimalHrs) {
-            const h = Math.floor(decimalHrs);
-            const m = Math.round((decimalHrs - h) * 60);
-            return h > 0 ? `${h}h${m}m` : `${m}m`;
-        }
+    function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
+    function toggleTodo(id) {
+        const t = window.dbData.todos.find(x=>x.id===id);
+        if(t) t.done = !t.done;
+        saveLocalOnly();
+    }
+    function saveLocalOnly() {
+        localStorage.setItem('sz_v13_db', JSON.stringify(window.dbData));
+        renderAll();
+    }
 
-        function showSection(id) {
-            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-        }
-    </script>
+    function showSection(id) {
+        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        if(event) event.currentTarget.classList.add('active');
+        if(id === 'results') renderResultsView();
+    }
+</script>
 </body>
 </html>
