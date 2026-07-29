@@ -157,10 +157,14 @@
         };
 
         const baseCats = [
-            { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', unit:'時間' },
-            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', unit:'km' },
-            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', unit:'kg' }
-        ];
+    { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', unit:'kg', type:'weight' },
+    { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', unit:'kcal', type:'val' },
+    { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', unit:'時間', type:'time' },
+    { id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', unit:'時間', type:'time' },
+    { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', unit:'km', type:'run' },
+    { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', unit:'文字', type:'diary' },
+    { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', unit:'時間', type:'sleep' }
+];
 
         function initApp() {
             renderCategories();
@@ -176,45 +180,74 @@
         }
 
         function openInput(id) {
-            window.currentCatId = id;
-            document.getElementById('input-area').classList.remove('hidden');
-            document.getElementById('input-title').innerText = id;
-            const fields = document.getElementById('dynamic-fields');
-            fields.innerHTML = '<input type="number" id="v1" placeholder="数値を入力" class="w-full">';
-        }
+    window.currentCatId = id;
+    const cat = baseCats.find(c => c.id === id);
+    document.getElementById('input-area').classList.remove('hidden');
+    document.getElementById('input-title').innerText = cat ? cat.name : "予定";
+    const fields = document.getElementById('dynamic-fields');
+    fields.innerHTML = '';
+
+    if (id === 'sleep') {
+        // 睡眠用の時間入力
+        fields.innerHTML = `
+            <div class="grid grid-cols-2 gap-2 text-xs font-bold text-gray-400">
+                <div>就寝時刻<input type="time" id="t1" value="23:00"></div>
+                <div>起床時刻<input type="time" id="t2" value="07:00"></div>
+            </div>`;
+    } else if (id === 'study' || id === 'exercise' || id === 'run') {
+        // 勉強や運動用の時・分入力
+        fields.innerHTML = `
+            <div class="flex gap-2 justify-center items-center">
+                <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
+                <input type="number" id="v_mins" placeholder="分" class="val-input"><span>m</span>
+            </div>`;
+        if(id === 'run') fields.innerHTML = `<input type="number" id="v_dist" placeholder="距離(km)" class="w-full mb-2">` + fields.innerHTML;
+    } else {
+        // 通常の数値入力
+        fields.innerHTML = `<input type="number" id="v1" placeholder="数値を入力" class="w-full">`;
+    }
+}
 
         function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
 
         async function saveRecord() {
-            const val = parseFloat(document.getElementById('v1').value || 0);
-            const memo = document.getElementById('rec-comment').value;
-            const date = new Date().toISOString().split('T')[0];
+    const memo = document.getElementById('rec-comment').value;
+    const date = new Date().toISOString().split('T')[0];
+    let val = 0;
 
-            const newRecord = {
-                userName: window.dbData.user.name,
-                catId: window.currentCatId,
-                val: val,
-                comment: memo,
-                date: date,
-                time: new Date().toLocaleTimeString('ja-JP')
-            };
+    if (window.currentCatId === 'sleep') {
+        const t1 = document.getElementById('t1').value, t2 = document.getElementById('t2').value;
+        val = (new Date("1970/1/2 " + t2) - new Date("1970/1/1 " + t1)) / 3600000;
+        if (val < 0) val += 24;
+    } else if (document.getElementById('v_hrs')) {
+        val = parseFloat(document.getElementById('v_hrs').value || 0) + (parseFloat(document.getElementById('v_mins').value || 0) / 60);
+    } else {
+        val = parseFloat(document.getElementById('v1').value || 0);
+    }
 
-            // 1. ローカルデータを更新
-            window.dbData.records.unshift(newRecord);
+    const newRecord = {
+        userName: window.dbData.user.name,
+        catId: window.currentCatId,
+        val: val,
+        comment: memo,
+        date: date,
+        time: new Date().toLocaleTimeString('ja-JP'),
+        createdAt: Date.now()
+    };
 
-            // 2. サーバー（Firestore）に保存
-            if (window.cloud) {
-                // ユーザー個別の全データを同期
-                await window.cloud.saveAllData(window.dbData.user.id, window.dbData);
-                // タイムラインにも流す
-                await window.cloud.postTimeline(newRecord);
-            }
+    window.dbData.records.unshift(newRecord);
 
-            closeInput();
-            renderAll();
-            alert("クラウドと同期しました！");
-        }
+    if (window.cloud) {
+        // 1. 自分の個人データをサーバーに保存（PCとの同期用）
+        await window.cloud.saveAllData(window.dbData.user.id, window.dbData);
+        // 2. タイムライン（全員用）に投稿を送信
+        await window.cloud.postTimeline(newRecord);
+    }
 
+    closeInput();
+    renderAll();
+    alert("同期完了！");
+}
         function renderTimeline(posts) {
             const list = document.getElementById('feed-list');
             list.innerHTML = posts.map(p => `
@@ -228,6 +261,13 @@
         function renderAll() {
             const d = new Date().toISOString().split('T')[0];
             document.getElementById('todo-display-list').innerHTML = window.dbData.todos.filter(t=>t.date===d).map(t => `<div class="flex gap-2 text-xs"><input type="checkbox"> <b>${t.time}</b> ${t.task}</div>`).join('');
+        }
+
+        // 時間を「○時間○分」の見た目にする
+        function formatTime(decimalHrs) {
+            const h = Math.floor(decimalHrs);
+            const m = Math.round((decimalHrs - h) * 60);
+            return h > 0 ? `${h}h${m}m` : `${m}m`;
         }
 
         function showSection(id) {
