@@ -285,14 +285,18 @@ const baseCats = [
     if (window.cloud && window.cloud.saveAllData) {
         await window.cloud.saveAllData(window.dbData.user.id, window.dbData);
     }
+    
     closeInput();
     renderAll();
     renderResultsView();
 }
     
-    function renderResultsView() {
-    const date = document.getElementById('results-date').value;
-    const prev = new Date(new Date(date).setDate(new Date(date).getDate()-1)).toISOString().split('T')[0];
+
+function renderResultsView() {
+    const resDateInput = document.getElementById('results-date');
+    if (!resDateInput) return;
+
+    const date = resDateInput.value;
     
     document.getElementById('result-sum-grid').innerHTML = baseCats.map(c => {
         const curRecs = window.dbData.records.filter(r=>r.date===date && r.catId===c.id);
