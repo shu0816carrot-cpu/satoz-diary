@@ -5,81 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Satoz Everyday Diary v12.0</title>
     <!-- iPhone用アイコン設定 -->
-<link rel="apple-touch-icon" href="icon.png">
-<!-- パソコンのタブやAndroid用アイコン設定 -->
-<link rel="icon" href="icon.png">
-    
-    <!-- Firebase SDK (サーバー通信用) -->
+    <link rel="apple-touch-icon" href="icon.png">
+    <!-- パソコンのタブやAndroid用アイコン設定 -->
+    <link rel="icon" href="icon.png">
+    <!-- Firebase SDKのインポート --><!-- Firebase設定（ここを追加） -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, limit, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyC3nZEh7H-3HdUSJ3KfUu1e2HNgYTa6yRs",
-            authDomain: "satoz-diary.firebaseapp.com",
-            projectId: "satoz-diary",
-            storageBucket: "satoz-diary.firebasestorage.app",
-            messagingSenderId: "596323639753",
-            appId: "1:596323639753:web:f4c4a93d1573eb8ab28818",
-            measurementId: "G-946NB26BB7"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyC3nZEh7H-3HdUSJ3KfUu1e2HNgYTa6yRs", // あなたのコード
+        authDomain: "satoz-diary.firebaseapp.com",
+        projectId: "satoz-diary",
+        storageBucket: "satoz-diary.firebasestorage.app",
+        messagingSenderId: "596323639753",
+        appId: "1:596323639753:web:f4c4a93d1573eb8ab28818"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-        // 各機能をwindowオブジェクトに登録（Ver11のロジックと繋ぐため）
-        window.saveToCloud = async (userData, allData) => {
-            const userRef = doc(db, "users", userData.id);
-            await setDoc(userRef, { userData, allData }, { merge: true });
-        };
-        
-        window.loadFromCloud = async (userId) => {
-            const userRef = doc(db, "users", userId);
-            const docSnap = await getDoc(userRef);
-            return docSnap.exists() ? docSnap.data() : null;
-        };
-
-        window.postToTimeline = async (post) => {
-            await addDoc(collection(db, "global_feed"), { ...post, createdAt: Date.now() });
-        };
-
-        window.syncTimeline = (callback) => {
-            const q = query(collection(db, "global_feed"), orderBy("createdAt", "desc"), limit(20));
-            return onSnapshot(q, (snapshot) => {
-                const posts = snapshot.docs.map(doc => doc.data());
-                callback(posts);
-            });
-        };
-        
-        console.log("Firebase Ver 12.0 Ready");
+    // 既存のプログラムからFirebaseを操作できるように窓口を作る
+    window.db = db;
+    window.fs = { collection, addDoc, onSnapshot, query, orderBy, limit, doc, setDoc };
     </script>
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
     <style>
         :root { --apple-bg: #f5f5f7; --apple-card: rgba(255, 255, 255, 0.85); --apple-text: #1d1d1f; --apple-accent: #0071e3; --glass: blur(25px) saturate(180%); }
         [data-theme="dark"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; }
         @media (prefers-color-scheme: dark) { [data-theme="auto"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; } }
+        
         body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, sans-serif; padding-bottom: 110px; transition: 0.3s; overflow-x: hidden; }
         .glass-card { background: var(--apple-card); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); border-radius: 22px; border: 1px solid rgba(120, 120, 120, 0.1); }
         .view-section { display: none; }
         .view-section.active { display: block; animation: slideUp 0.4s ease-out; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
         .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 85px; background: var(--apple-card); backdrop-filter: blur(25px); border-top: 0.5px solid rgba(120,120,120,0.2); display: flex; align-items: center; z-index: 9999; }
         .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 8px; font-weight: bold; background: none; border: none; }
         .nav-item.active { color: var(--apple-accent); }
+        
         input, select, textarea { background: rgba(120,120,120,0.1); border: none; border-radius: 12px; padding: 12px; color: inherit; outline: none; }
         .chip { white-space: nowrap; font-size: 10px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(120,120,120,0.1); }
         .chip.active { background: var(--apple-accent); color: white; }
+        
         .todo-title { font-size: 15px; font-weight: 800; }
         .todo-memo { font-size: 11px; font-weight: 500; color: #0071e3; }
         .todo-checked { opacity: 0.4; text-decoration: line-through; }
+        
         .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
         .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
         .val-input { font-size: 14px; width: 60px; text-align: center; border-bottom: 1px solid var(--apple-accent); }
+        .notif-badge { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; border: 2px solid white; display: none; }
+        .notif-badge.active { display: block; }
     </style>
 </head>
 <body>
@@ -87,18 +68,31 @@
     <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
         <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
         <div class="flex items-center gap-3">
+            <div class="relative cursor-pointer" onclick="toggleNotifs()">
+                <i class="bi bi-bell-fill text-gray-500 text-lg"></i>
+                <span id="notif-badge-ui" class="notif-badge"></span>
+            </div>
+            <div class="cursor-pointer" onclick="showSection('settings')">
+                <i class="bi bi-gear-wide-connected text-gray-500 text-lg"></i>
+            </div>
             <div id="realtime-clock" class="text-xs font-bold px-3 py-1 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
         </div>
     </header>
 
+    <!-- 通知ドロップダウン -->
+    <div id="notif-dropdown" class="fixed top-16 right-4 w-64 glass-card p-4 hidden z-[100] shadow-2xl">
+        <h4 class="text-xs font-bold mb-3 border-b pb-1">Notifications</h4>
+        <div id="notif-items" class="space-y-3 max-h-60 overflow-y-auto text-[10px]"></div>
+    </div>
+
     <main class="max-w-md mx-auto px-4">
         
-        <!-- 1. 記録・予定 (Ver 11.0 準拠) -->
+        <!-- 1. 記録・予定 (Home) -->
         <section id="home" class="view-section active">
             <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-bold text-sm">予定管理 (今日・明日連動)</h2>
-                    <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 追加</button>
+                    <h2 class="font-bold text-sm">予定管理 (今日・明日)</h2>
+                    <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
                 </div>
                 <div id="todo-display-list" class="space-y-4"></div>
             </div>
@@ -108,29 +102,31 @@
             <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
                 <div class="flex justify-between items-center mb-4">
                     <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
-                    <div onclick="closeInput()" class="cursor-pointer text-xl">×</div>
+                    <div onclick="closeInput()" class="cursor-pointer text-xl text-gray-400">×</div>
                 </div>
                 <div class="grid grid-cols-2 gap-2 mb-4 text-[10px] font-bold text-gray-400 uppercase">
                     <div>日付<input type="date" id="rec-date"></div>
                     <div>時刻<input type="time" id="rec-time"></div>
                 </div>
                 <div id="dynamic-fields" class="space-y-4"></div>
-                <textarea id="rec-comment" placeholder="メモ・日記（任意）" rows="2" class="mt-4 w-full text-xs"></textarea>
+                <textarea id="rec-comment" placeholder="一言メモ（任意）" rows="2" class="mt-4 w-full text-xs"></textarea>
                 
                 <div id="calorie-preview" class="hidden mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-200">
+                    <p class="text-[10px] font-bold text-orange-500 uppercase">カロリー計算</p>
                     <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
                 </div>
-                <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">サーバーへ保存</button>
+                <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">記録を保存</button>
             </div>
+            <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2">＋ カテゴリー追加</button>
         </section>
 
-        <!-- 2. タイムライン (Firebase リアルタイム連動) -->
+        <!-- 2. タイムライン -->
         <section id="timeline" class="view-section">
-            <h2 class="text-xl font-black mb-6 italic text-blue-600">Global Feed</h2>
-            <div id="feed-list" class="space-y-4 text-center text-gray-400 text-xs">読み込み中...</div>
+            <h2 class="text-xl font-black mb-6 italic">Timeline</h2>
+            <div id="feed-list" class="space-y-4"></div>
         </section>
 
-        <!-- 3. 結果 -->
+        <!-- 3. 結果 (合計と前日比表示) -->
         <section id="results" class="view-section">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-black italic">Results</h2>
@@ -143,17 +139,26 @@
             </div>
         </section>
 
-        <!-- 4. ランキング -->
+        <!-- 4. ランキング (日付・グループコード対応) -->
         <section id="ranking" class="view-section">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-black italic">Rankings</h2>
                 <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
             </div>
             <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
-            <div id="ranking-display" class="glass-card overflow-hidden"></div>
+            
+            <div class="glass-card p-6 mt-6 mb-6">
+                <h3 class="text-xs font-bold mb-4 uppercase italic">Group Hub (6-digit Code)</h3>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="group-code-in" placeholder="コード入力" class="flex-1 text-xs">
+                    <button onclick="joinGroup()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold">参加</button>
+                </div>
+                <button onclick="createGroup()" class="w-full bg-black text-white py-3 rounded-xl text-xs font-bold">新規グループ作成</button>
+                <div id="ranking-display" class="mt-6 overflow-hidden"></div>
+            </div>
         </section>
 
-        <!-- 5. 本人 (Firebase経由のアイコン表示) -->
+        <!-- 5. 本人 (Owner: 統計とグラフ復旧) -->
         <section id="profile" class="view-section">
             <div id="profile-header-area"></div>
             <div class="glass-card p-6 mb-6 text-center">
@@ -166,13 +171,22 @@
             </div>
         </section>
 
-        <!-- 6. 設定 (アイコン変更プログラム最適化) -->
+        <!-- 6. 検索 -->
+        <section id="search" class="view-section">
+            <h2 class="text-xl font-black mb-6">Search</h2>
+            <div class="glass-card p-6 mb-4">
+                <input type="text" id="search-input" placeholder="ユーザーIDで検索" oninput="performSearch()">
+            </div>
+            <div id="search-results-list" class="space-y-4"></div>
+        </section>
+
+        <!-- 設定セクション (身体情報・プライバシー) -->
         <section id="settings" class="view-section">
-            <h2 class="text-xl font-bold mb-6">Settings</h2>
+            <h2 class="text-xl font-bold mb-6">Profile Settings</h2>
             <div class="glass-card p-5 space-y-4">
                 <div class="flex flex-col items-center gap-2">
                     <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
-                    <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコンをサーバーに保存</button>
+                    <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
                     <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="handleFile(event)">
                 </div>
                 <input type="text" id="set-name" placeholder="名前">
@@ -182,25 +196,42 @@
                     <input type="number" id="set-height" placeholder="身長(cm)">
                     <input type="number" id="set-age" placeholder="年齢">
                 </div>
-                <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">クラウドへ保存</button>
+                <div id="privacy-list-container" class="space-y-3 border-t pt-4"></div>
+                <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">設定を保存</button>
+            </div>
+        </section>
+
+        <!-- カテゴリ作成 (Ver 10.8継承) -->
+        <section id="cat-maker" class="view-section">
+            <h2 class="text-xl font-bold mb-6">Category Maker</h2>
+            <div class="glass-card p-6 space-y-4">
+                <input type="text" id="new-cat-name" placeholder="カテゴリ名">
+                <div class="flex gap-4 justify-around text-xl py-2">
+                    <i class="bi bi-lightning-charge cursor-pointer" onclick="selIcon('bi-lightning-charge', this)"></i>
+                    <i class="bi bi-tag cursor-pointer text-blue-500" onclick="selIcon('bi-tag', this)"></i>
+                    <i class="bi bi-book cursor-pointer" onclick="selIcon('bi-book', this)"></i>
+                    <i class="bi bi-fire cursor-pointer" onclick="selIcon('bi-fire', this)"></i>
+                </div>
+                <select id="new-cat-unit"><option value="時間">時間/分</option><option value="km">km</option><option value="kcal">kcal</option><option value="回">回</option></select>
+                <button onclick="createCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl">作成</button>
             </div>
         </section>
 
     </main>
 
-    <!-- タブメニュー -->
+    <!-- ナビゲーション -->
     <nav class="tab-bar">
         <button onclick="showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
         <button onclick="showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
         <button onclick="showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
         <button onclick="showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
         <button onclick="showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
-        <button onclick="showSection('settings')" class="nav-item"><i class="bi bi-gear text-lg"></i><div>設定</div></button>
+        <button onclick="showSection('search')" class="nav-item"><i class="bi bi-search text-lg"></i><div>検索</div></button>
     </nav>
 
     <script>
-        // --- データ同期 & Ver 11.0 ロジック復旧 ---
-        let dbData = JSON.parse(localStorage.getItem('sz_v11_db') || '{"user":{"name":"Guest","id":"user_'+Date.now()+'","weight":65,"height":170,"age":20,"avatar":null},"records":[],"todos":[],"cats":[],"follows":[],"followers":[],"notifications":[],"groups":[],"dummyUsers":[]}');
+        // --- データベース Ver. 11.0 ---
+        let db = JSON.parse(localStorage.getItem('sz_v11_db') || '{"user":{"name":"Sato","id":"sato_001","avatar":null,"weight":65,"height":170,"age":20,"privacy":{},"points":1000},"records":[],"todos":[],"cats":[],"follows":[],"followers":[],"notifications":[],"groups":[],"dummyUsers":[]}');
         
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
@@ -212,33 +243,23 @@
             { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
         ];
 
-        let currentCatId = '', rankCatId = 'study', charts = {};
+        const studyLib = ["国語", "数学", "物理", "化学", "英語", "その他"];
+        const workoutLib = ["レッグプレス", "ラットプルダウン", "チェストプレス", "ショルダープレス", "レッグエクステンション", "レッグカール", "シーテッドロー", "ペックデック", "ケーブルクロスオーバー", "アブドミナルクランチ", "シットアップ", "懸垂", "スクワット", "ランジ", "クランチ", "プランク", "ディップス", "バーピー", "マウンテンクライマー", "レッグレイズ"];
 
-        // 起動時処理
-        window.addEventListener('load', async () => {
-            const cloudData = await window.loadFromCloud(dbData.user.id);
-            if(cloudData) {
-                dbData = cloudData.allData;
-                localStorage.setItem('sz_v11_db', JSON.stringify(dbData));
-            }
+        let currentCatId = '', rankCatId = 'study', activeProfileUser = null, selectedIcon = 'bi-tag', charts = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if(db.dummyUsers.length === 0) db.dummyUsers = [{ id:"elaine_99", name:"Elaine", avatar:null, followers:120, following:80 }];
+            document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('rank-date').value = new Date().toISOString().split('T')[0];
             initApp();
-            // Firebase タイムライン監視開始
-            if(window.syncTimeline) {
-                window.syncTimeline((posts) => {
-                    const list = document.getElementById('feed-list');
-                    list.innerHTML = posts.map(p => `
-                        <div class="glass-card p-4 relative shadow-sm text-left">
-                            <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName}・${p.userName}</p>
-                            <p class="todo-title">${p.valDisp}</p>
-                            <p class="text-[11px] opacity-80 mt-1">${p.comment || ''}</p>
-                            <p class="text-[8px] text-gray-400 mt-2">${p.date} ${p.time}</p>
-                        </div>`).join('') || '<p class="text-center text-xs text-gray-400">フィードはありません</p>';
-                });
-            }
+            setInterval(() => document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('ja-JP'), 1000);
+            listenToGlobalTimeline();
         });
 
         function initApp() {
-            const u = dbData.user;
+            const u = db.user;
+            activeProfileUser = u;
             document.getElementById('set-name').value = u.name;
             document.getElementById('set-id').value = u.id;
             document.getElementById('set-weight').value = u.weight;
@@ -246,80 +267,208 @@
             document.getElementById('set-age').value = u.age;
             document.getElementById('set-avatar-preview').src = u.avatar || `https://ui-avatars.com/api/?name=${u.name}`;
             renderCategories();
+            renderPrivacyUI();
             renderAll();
-            setInterval(() => document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('ja-JP'), 1000);
         }
 
-        // --- Ver 11.0 記録保存 & Firebase同期 ---
-        async function saveRecord() {
+        // --- 記録保存 (Ver 10.8の死守) ---
+        function saveRecord() {
             const memo = document.getElementById('rec-comment').value.trim();
             const date = document.getElementById('rec-date').value;
             const time = document.getElementById('rec-time').value;
             let val = 0;
+            let sub = document.getElementById('sub_sel')?.value || "";
 
             if(currentCatId === 'schedule') {
-                const task = prompt("予定の名前:");
+                const task = document.getElementById('v_task_todo').value;
                 if(!task) return;
-                dbData.todos.push({ id:Date.now(), time, task, memo, done:false, date });
+                db.todos.push({ id:Date.now(), time, task, memo, done:false, date });
             } else {
-                const cat = baseCats.find(c => c.id === currentCatId);
+                const cat = [...baseCats, ...db.cats].find(c => c.id === currentCatId);
                 if(cat.type === 'time' || cat.type === 'run') {
                     val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
                 } else if(currentCatId === 'sleep') {
-                    const t1 = document.getElementById('t1').value, t2 = document.getElementById('t2').value;
-                    val = (new Date("1970/1/2 "+t2) - new Date("1970/1/1 "+t1)) / 3600000;
-                    if(val < 0) val += 24;
+                    const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
+                    const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
+                    val = (e - s) / 3600000; if(val < 0) val += 24;
+                } else if(currentCatId === 'diary') {
+                    val = memo.length;
                 } else {
                     val = parseFloat(document.getElementById('v1')?.value || 0);
                 }
                 
-                if(currentCatId === 'weight') dbData.user.weight = val;
+                if(currentCatId === 'weight') db.user.weight = val;
 
-                // 保存データ
-                const post = { id:Date.now(), catId:currentCatId, catName:cat.name, val, valDisp: val.toFixed(1) + cat.unit, date, time, comment:memo, userName: dbData.user.name, userId: dbData.user.id };
-                dbData.records.unshift(post);
-                
-                // Firebase送信
-                if(window.postToTimeline) window.postToTimeline(post);
-            }
+                async function saveRecord() { // 1. asyncを追加
+    // ...これまでの計算コード（そのまま残す）...
+
+    const newRecord = { 
+        id: Date.now(), 
+        catId: currentCatId, 
+        val: val, 
+        date: date, 
+        time: time, 
+        sub: sub, 
+        comment: memo, 
+        userName: db.user.name // 名前も一緒に送る
+    };
+
+    // 2. 自分のスマホに保存
+    db.records.unshift(newRecord);
+    saveDB(); 
+
+    // 3. 【ここを追加】サーバー（Firebase）に送信！
+    if (window.db) {
+        await window.fs.addDoc(window.fs.collection(window.db, "global_posts"), newRecord);
+    }
+
+    closeInput();
+}; closeInput();
+        }
+
+        // --- 予定管理 (今日・明日連動) ---
+        function getTodoLists() {
+            const today = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
+            return { today, tomorrow };
+        }
+
+        // --- 結果画面 (数値合計と前日比表示) ---
+        function renderResultsView() {
+            const date = document.getElementById('results-date').value;
+            const prev = new Date(new Date(date).setDate(new Date(date).getDate()-1)).toISOString().split('T')[0];
+            const all = [...baseCats, ...db.cats];
             
-            saveLocalAndCloud();
-            closeInput();
-            alert("クラウドに同期しました");
+            document.getElementById('result-sum-grid').innerHTML = all.filter(c=>c.type!=='todo').map(c => {
+                const curRecs = db.records.filter(r=>r.date===date && r.catId===c.id);
+                const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s,a)=>s+a.val,0);
+                
+                const oldRecs = db.records.filter(r=>r.date===prev && r.catId===c.id);
+                const old = (c.id === 'weight') ? (oldRecs[0]?.val || 0) : oldRecs.reduce((s,a)=>s+a.val,0);
+                
+                const diff = cur - old;
+                let valDisp = (c.type==='time') ? formatTime(cur) : `${cur.toFixed(1)}${c.unit}`;
+                if(c.type==='diary') valDisp = `${cur}文字`;
+
+                const diffH = cur === 0 ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
+                
+                return cur > 0 ? `<div class="glass-card p-3 text-center"><p class="text-[8px] font-bold text-gray-400 uppercase">${c.name}</p><p class="text-sm font-black text-blue-600">${valDisp}</p>${diffH}</div>` : '';
+            }).join('');
+
+            document.getElementById('result-todo-list').innerHTML = db.todos.filter(t=>t.date===date && t.done).map(t => `<div class="p-2 bg-green-50 text-[10px] rounded-lg">✓ ${t.task} <p class="text-[8px] opacity-60">${t.memo||''}</p></div>`).join('');
         }
 
-        function saveLocalAndCloud() {
-            localStorage.setItem('sz_v11_db', JSON.stringify(dbData));
-            if(window.saveToCloud) window.saveToCloud(dbData.user, dbData);
-            renderAll();
-        }
-
-        function handleFile(e) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                dbData.user.avatar = ev.target.result;
-                document.getElementById('set-avatar-preview').src = ev.target.result;
-            };
-            reader.readAsDataURL(e.target.files[0]);
-        }
-
-        function saveSettings() {
-            dbData.user.name = document.getElementById('set-name').value;
-            dbData.user.id = document.getElementById('set-id').value;
-            dbData.user.weight = parseFloat(document.getElementById('set-weight').value);
-            dbData.user.height = parseFloat(document.getElementById('set-height').value);
-            dbData.user.age = parseInt(document.getElementById('set-age').value);
-            saveLocalAndCloud();
-            initApp();
-            alert("設定をクラウドに保存しました");
-        }
-
-        // --- 以下 UI補助ロジック (Ver 11.0 継承) ---
+        // --- UI生成 ---
         function openInput(id) {
             currentCatId = id;
-            const cat = [...baseCats, ...dbData.cats].find(c => c.id === id);
+            const cat = [...baseCats, ...db.cats].find(c => c.id === id);
             document.getElementById('input-area').classList.remove('hidden');
             document.getElementById('input-title').innerText = cat ? cat.name : "予定";
             document.getElementById('rec-date').value = new Date().toISOString().split('T')[0];
             document.getElementById('rec-time').value = new Date().toTimeString().slice(0,5);
-            const fields = documen
+            const fields = document.getElementById('dynamic-fields');
+            fields.innerHTML = ''; document.getElementById('calorie-preview').classList.add('hidden');
+
+            if(id === 'study') {
+                fields.innerHTML = `<select id="sub_sel" class="w-full mb-2">${studyLib.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
+                <div class="flex gap-2 justify-center items-center mt-2"><input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span><input type="number" id="v_mins" placeholder="分" class="val-input"><span>m</span></div>`;
+            } else if(id === 'run') {
+                fields.innerHTML = `<select id="sub_sel" class="w-full mb-2" onchange="updatePreCal()"><option value="ランニング">ランニング</option><option value="ウォーキング">ウォーキング</option></select>
+                <input type="number" id="v_dist" placeholder="走行距離(km)" class="w-full mb-2" oninput="updatePreCal()">
+                <div class="flex gap-2 justify-center items-center mt-2"><input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span><input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span></div>`;
+                document.getElementById('calorie-preview').classList.remove('hidden');
+            } else if(id === 'exercise') {
+                fields.innerHTML = `<select id="sub_sel" class="w-full mb-2" onchange="updatePreCal()">${workoutLib.map(w=>`<option value="${w}">${w}</option>`).join('')}</select>
+                <div class="flex gap-2 justify-center items-center mt-2"><input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span><input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span></div>`;
+                document.getElementById('calorie-preview').classList.remove('hidden');
+            } else if(id === 'sleep') {
+                fields.innerHTML = `<div class="grid grid-cols-2 gap-2 text-[10px] font-bold"><div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}"></div><div>時刻<input type="time" id="sleep_s_time" value="23:00"></div><div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}"></div><div>時刻<input type="time" id="sleep_e_time" value="07:00"></div></div>`;
+            } else if(id === 'schedule') {
+                fields.innerHTML = `<select id="todo-date-sel" class="w-full mb-2"><option value="today">今日</option><option value="tomorrow">明日</option></select><input type="text" id="v_task_todo" placeholder="予定内容 (例: 買い物)">`;
+            } else {
+                fields.innerHTML = `<input type="number" id="v1" placeholder="${cat.unit}を入力" class="w-full">`;
+            }
+        }
+
+        function renderAll() {
+            const { today, tomorrow } = getTodoLists();
+            const todayTodos = db.todos.filter(t => t.date === today);
+            const tomorrowTodos = db.todos.filter(t => t.date === tomorrow);
+            
+            document.getElementById('todo-display-list').innerHTML = `
+                <p class="text-[10px] font-bold text-gray-400">TODAY</p>
+                ${todayTodos.map(t => `<div class="flex items-start gap-3 p-3 bg-white/40 rounded-xl"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${t.id})" class="mt-1 w-4 h-4"><div><p class="todo-title ${t.done?'todo-checked':''}">${t.task}</p><p class="todo-memo">${t.memo || ''}</p></div></div>`).join('')}
+                <p class="text-[10px] font-bold text-gray-400 mt-4">TOMORROW</p>
+                ${tomorrowTodos.map(t => `<div class="flex items-start gap-3 p-3 bg-white/20 rounded-xl opacity-60"><div><p class="todo-title">${t.task}</p><p class="todo-memo">${t.memo || ''}</p></div></div>`).join('')}
+            `;
+            
+            document.getElementById('feed-list').innerHTML = db.records.slice(0,20).map(r => {
+                const cat = [...baseCats, ...db.cats].find(c => c.id === r.catId);
+                const valDisp = (cat.type==='time') ? formatTime(r.val) : `${r.val.toFixed(1)} ${cat.unit}`;
+                return `<div class="glass-card p-4 relative"><div class="absolute top-4 right-4 text-red-400 text-xs" onclick="deletePost(${r.id})">削除</div><p class="text-[10px] font-bold text-blue-600 uppercase">${cat.name}・${r.date}</p><p class="todo-title">${valDisp} ${r.sub?'('+r.sub+')':''}</p><p class="todo-memo">${r.comment||''}</p><div class="mt-2 flex gap-4 text-xs font-bold text-gray-400"><span onclick="addLike(${r.id})"><i class="bi bi-heart"></i> ${r.likes||0}</span><span onclick="openComment(${r.id})"><i class="bi bi-chat"></i></span></div></div>`;
+            }).join('');
+        }
+        // サーバーのタイムラインをリアルタイムで監視する関数
+        function listenToGlobalTimeline() {
+    if (!window.db) return;
+
+    // 「global_posts」という場所を日付順に監視
+    const q = window.fs.query(
+        window.fs.collection(window.db, "global_posts"),
+        window.fs.orderBy("id", "desc"),
+        window.fs.limit(30)
+    );
+
+    window.fs.onSnapshot(q, (snapshot) => {
+        const feedList = document.getElementById('feed-list');
+        feedList.innerHTML = ""; // 一旦クリア
+
+        snapshot.forEach((doc) => {
+            const r = doc.data();
+            // タイムラインの見た目を生成（Ver 11.0のデザインを維持）
+            feedList.innerHTML += `
+                <div class="glass-card p-4 relative shadow-sm">
+                    <p class="text-[10px] font-bold text-blue-600 uppercase">${r.userName}の${r.catId}</p>
+                    <p class="todo-title">${r.sub} : ${r.val.toFixed(1)}</p>
+                    <p class="todo-memo">${r.comment}</p>
+                </div>`;
+        });
+    });
+}
+
+        // --- 共通 (Ver 10.8継承) ---
+        function formatTime(h) { const hr = Math.floor(h); const mn = Math.round((h-hr)*60); return hr>0?`${hr}時間${mn}分`:`${mn}分`; }
+        function saveDB() { localStorage.setItem('sz_v11_db', JSON.stringify(db)); renderAll(); renderResultsView(); }
+        function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
+        function deletePost(id) { if(confirm("削除しますか？")){ db.records=db.records.filter(r=>r.id!==id); saveDB(); } }
+        function addLike(id) { const r=db.records.find(x=>x.id===id); r.likes=(r.likes||0)+1; saveDB(); }
+        function openComment(id) { const msg = prompt("コメント:"); if(msg){ const r=db.records.find(x=>x.id===id); r.comments.push({user:db.user.name, text:msg}); saveDB(); } }
+        function toggleTodo(id) { const t=db.todos.find(x=>x.id===id); t.done=!t.done; saveDB(); }
+        function updatePreCal() { const h=parseFloat(document.getElementById('v_hrs')?.value||0), m=parseFloat(document.getElementById('v_mins')?.value||0); const cat=baseCats.find(c=>c.id===currentCatId); if(cat) document.getElementById('cal-val').innerText=Math.round(cat.mets*db.user.weight*(h+m/60)*1.05)+" kcal"; }
+        function showSection(id) { document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); if(id==='profile') renderProfilePage(); if(id==='ranking') updateRankList(rankCatId); renderAll(); window.scrollTo(0,0); }
+        function renderProfilePage() {
+            const u = db.user;
+            document.getElementById('profile-header-area').innerHTML = `<div class="glass-card p-6 mb-6 flex flex-col items-center"><img src="${u.avatar || 'https://ui-avatars.com/api/?name='+u.name}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover"><h2 class="text-xl font-black mt-4">${u.name}</h2><p class="text-[10px] text-gray-400">@${u.id}</p><div class="flex gap-8 mt-4"><div><p class="text-sm font-bold">${db.followers.length}</p><p class="text-[8px] text-gray-400">Followers</p></div><div><p class="text-sm font-bold">${db.follows.length}</p><p class="text-[8px] text-gray-400">Following</p></div></div></div>`;
+            const ctxPie = document.getElementById('profilePieChart').getContext('2d');
+            if(charts.pie) charts.pie.destroy();
+            charts.pie = new Chart(ctxPie, { type:'doughnut', data:{ labels:['活動','未記入'], datasets:[{ data:[10,14], backgroundColor:['#0071e3','#e5e5e7'] }] }, options:{ cutout:'75%', plugins:{ legend:{display:false}} } });
+            const ctxBar = document.getElementById('profileBarChart').getContext('2d');
+            if(charts.bar) charts.bar.destroy();
+            charts.bar = new Chart(ctxBar, { type:'bar', data:{ labels:['M','T','W','T','F','S','S'], datasets:[{ data:[5,8,3,10,6,4,9], backgroundColor:'#0071e3', borderRadius:5 }] }, options:{ plugins:{ legend:{display:false}} } });
+        }
+        function updateRankList(id) { rankCatId=id; document.getElementById('rank-filters').innerHTML=[...baseCats, ...db.cats].filter(c=>c.type!=='todo').map(c=>`<button onclick="updateRankList('${c.id}')" class="chip ${rankCatId===c.id?'active':''}">${c.name}</button>`).join(''); const myV=db.records.filter(r=>r.catId===id).reduce((s,a)=>s+a.val,0); document.getElementById('ranking-display').innerHTML=`<div class="flex items-center p-4 bg-white/50"><span class="w-8 font-black text-yellow-500">1</span><span class="flex-1 font-bold text-sm">あなた</span><span class="font-black text-blue-600 text-xs">${myV.toFixed(1)}</span></div>`; }
+        function joinGroup() { const c=document.getElementById('group-code-in').value; if(c.length===6){ db.groups.push({name:"参加グループ", code:c}); saveDB(); alert("参加完了"); } }
+        function createGroup() { const c=Math.random().toString(36).substr(2,6).toUpperCase(); const n=prompt("グループ名:"); if(n){ db.groups.push({name:n, code:c}); saveDB(); alert("コード: "+c); } }
+        function saveSettings() { db.user.name=document.getElementById('set-name').value; db.user.id=document.getElementById('set-id').value; db.user.weight=parseFloat(document.getElementById('set-weight').value); db.user.height=parseFloat(document.getElementById('set-height').value); db.user.age=parseInt(document.getElementById('set-age').value); saveDB(); initApp(); alert("保存完了"); }
+        function handleFile(e) { const r=new FileReader(); r.onload=(ev)=>{db.user.avatar=ev.target.result; document.getElementById('set-avatar-preview').src=ev.target.result;}; r.readAsDataURL(e.target.files[0]); }
+        function selIcon(i,e) { selectedIcon=i; document.querySelectorAll('.bi-lightning-charge, .bi-tag, .bi-book, .bi-fire').forEach(x=>x.classList.remove('text-blue-500')); e.classList.add('text-blue-500'); }
+        function renderPrivacyUI() { document.getElementById('privacy-list-container').innerHTML=[...baseCats, ...db.cats].map(c=>`<div class="flex justify-between items-center text-xs"><span>${c.name}</span><select id="p-${c.id}"><option value="t" ${db.user.privacy[c.id]!==false?'selected':''}>公開</option><option value="f" ${db.user.privacy[c.id]===false?'selected':''}>非公開</option></select></div>`).join(''); }
+        function renderCategories() { document.getElementById('category-grid').innerHTML=baseCats.map(c=>`<button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center"><i class="${c.icon} text-lg mb-1" style="color:${c.color||'#0071e3'}"></i><span class="text-[9px] font-bold">${c.name}</span></button>`).join(''); }
+        function performSearch() {}
+        function createCategory() { const n=document.getElementById('new-cat-name').value; if(n){ db.cats.push({id:'custom_'+Date.now(), name:n, unit:'val', type:'val', icon:selectedIcon}); saveDB(); initApp(); showSection('home'); } }
+        function toggleNotifs() { document.getElementById('notif-dropdown').classList.toggle('hidden'); }
+        function openInviteQR() { document.getElementById('qr-popup-box').classList.remove('hidden'); document.getElementById('invite-qr').innerHTML = ""; new QRCode(document.getElementById("invite-qr"), { text: `satoz://user/${db.user.id}`, width: 160, height: 160 }); }
+    </script>
+    <div id="qr-popup-box" class="fixed inset-0 bg-black/70 z-[100] hidden flex items-center justify-center p-10"><div class="bg-white rounded-[40px] p-10 flex flex-col items-center w-full max-w-xs"><div id="invite-qr"></div><button onclick="document.getElementById('qr-popup-box').classList.add('hidden')" class="mt-8 text-blue-600 font-bold">Close</button></div></div>
+</body>
+</html>
