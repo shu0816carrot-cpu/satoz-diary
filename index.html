@@ -231,6 +231,20 @@ const baseCats = [
 
         function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
 
+        function updatePreCal() {
+    const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
+    const m = parseFloat(document.getElementById('v_mins')?.value || 0);
+    const dist = parseFloat(document.getElementById('v_dist')?.value || 0);
+    const totalH = h + (m / 60);
+    
+    const cat = baseCats.find(c => c.id === window.currentCatId);
+    if (cat && document.getElementById('cal-val')) {
+        // 体重をもとにカロリー計算 (Ver 11.0のロジック)
+        const burn = Math.round(cat.mets * window.dbData.user.weight * totalH * 1.05);
+        document.getElementById('cal-val').innerText = burn;
+    }
+}
+
         async function saveRecord() {
     const memo = document.getElementById('rec-comment').value.trim();
     const date = document.getElementById('rec-date').value;
@@ -271,7 +285,11 @@ const baseCats = [
     if (window.cloud && window.cloud.saveAllData) {
         await window.cloud.saveAllData(window.dbData.user.id, window.dbData);
     }
-
+    closeInput();
+    renderAll();
+    renderResultsView();
+}
+    
     function renderResultsView() {
     const date = document.getElementById('results-date').value;
     const prev = new Date(new Date(date).setDate(new Date(date).getDate()-1)).toISOString().split('T')[0];
