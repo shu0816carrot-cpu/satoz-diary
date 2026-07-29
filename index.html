@@ -32,11 +32,11 @@
             logout: () => signOut(auth),
             // 全データをサーバーに保存
             saveAllData: async (uid, data) => {
-                await setDoc(doc(db, "users", uid), data);
+                await setDoc(doc(dbData, "users", uid), data);
             },
             // 投稿をタイムラインに送る
             postTimeline: async (post) => {
-                await addDoc(collection(db, "timeline"), { ...post, createdAt: Date.now() });
+                await addDoc(collection(dbData, "timeline"), { ...post, createdAt: Date.now() });
             }
         };
 
@@ -45,7 +45,7 @@
             if (user) {
                 console.log("Logged in as:", user.displayName);
                 // サーバーからデータを取得
-                const docSnap = await getDoc(doc(db, "users", user.uid));
+                const docSnap = await getDoc(doc(dbData, "users", user.uid));
                 if (docSnap.exists()) {
                     window.dbData = docSnap.data();
                 } else {
@@ -192,12 +192,6 @@
 
     <script>
         // --- データ管理エンジン ---
-        window.dbData = {
-            user: { name: "", id: "", avatar: null, weight: 65, height: 170, age: 20 },
-            records: [],
-            todos: [],
-            cats: []
-        };
 
         const baseCats = [
            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
@@ -338,30 +332,11 @@
             grid.innerHTML = baseCats.map(c => `<button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center"><i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i><span class="text-[9px] font-bold">${c.name}</span></button>`).join('');
         }
 
-        function openInput(id) {
-            window.currentCatId = id;
-            document.getElementById('input-area').classList.remove('hidden');
-            document.getElementById('input-title').innerText = id;
-            const fields = document.getElementById('dynamic-fields');
-            fields.innerHTML = '<input type="number" id="v1" placeholder="数値を入力" class="w-full">';
-        }
+
 
         function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
 
-        async function saveRecord() {
-            const val = parseFloat(document.getElementById('v1').value || 0);
-            const memo = document.getElementById('rec-comment').value;
-            const date = new Date().toISOString().split('T')[0];
-
-            const newRecord = {
-                userName: window.dbData.user.name,
-                catId: window.currentCatId,
-                val: val,
-                comment: memo,
-                date: date,
-                time: new Date().toLocaleTimeString('ja-JP')
-            };
-
+        
             // 1. ローカルデータを更新
             window.dbData.records.unshift(newRecord);
 
@@ -388,10 +363,6 @@
                 </div>`).join('');
         }
 
-        function renderAll() {
-            const d = new Date().toISOString().split('T')[0];
-            document.getElementById('todo-display-list').innerHTML = window.dbData.todos.filter(t=>t.date===d).map(t => `<div class="flex gap-2 text-xs"><input type="checkbox"> <b>${t.time}</b> ${t.task}</div>`).join('');
-        }
         
 
         function showSection(id) {
