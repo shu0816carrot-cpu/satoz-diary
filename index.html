@@ -74,68 +74,73 @@
         }
     </script>
 
+     <!-- 2. デザイン (Ver 11.0と同一) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root { --apple-bg: #f5f5f7; --apple-card: rgba(255, 255, 255, 0.85); --apple-text: #1d1d1f; --apple-accent: #0071e3; --glass: blur(25px) saturate(180%); }
         [data-theme="dark"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; }
-        body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, sans-serif; padding-bottom: 100px; transition: 0.3s; overflow-x: hidden; }
-        .glass-card { background: var(--apple-card); backdrop-filter: var(--glass); border-radius: 22px; border: 1px solid rgba(120, 120, 120, 0.1); }
+        @media (prefers-color-scheme: dark) { [data-theme="auto"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; } }
+        body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, sans-serif; padding-bottom: 110px; transition: 0.3s; overflow-x: hidden; }
+        .glass-card { background: var(--apple-card); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); border-radius: 22px; border: 1px solid rgba(120, 120, 120, 0.1); }
         .view-section { display: none; }
         .view-section.active { display: block; animation: slideUp 0.4s ease-out; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 85px; background: var(--apple-card); backdrop-filter: blur(25px); border-top: 0.5px solid rgba(120,120,120,0.2); display: flex; align-items: center; z-index: 9999; }
-        .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 8px; font-weight: bold; background: none; }
+        .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 8px; font-weight: bold; background: none; border: none; }
         .nav-item.active { color: var(--apple-accent); }
+        input, select, textarea { background: rgba(120,120,120,0.1); border: none; border-radius: 12px; padding: 12px; color: inherit; outline: none; }
+        .chip { white-space: nowrap; font-size: 10px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(120,120,120,0.1); }
+        .chip.active { background: var(--apple-accent); color: white; }
+        .todo-title { font-size: 15px; font-weight: 800; }
+        .todo-memo { font-size: 11px; font-weight: 500; color: #0071e3; }
+        .todo-checked { opacity: 0.4; text-decoration: line-through; }
+        .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
+        .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
+        .val-input { font-size: 14px; width: 60px; text-align: center; border-bottom: 1px solid var(--apple-accent); }
     </style>
 </head>
 <body>
 
-    <!-- ログイン画面 -->
-    <div id="login-screen" class="fixed inset-0 z-[10000] bg-white dark:bg-black flex flex-col items-center justify-center text-center p-10">
-        <h1 class="text-4xl font-black text-blue-600 mb-2">Satoz Diary</h1>
-        <p class="text-gray-400 mb-10">スマホとPCでデータを同期</p>
-        <button onclick="window.cloud.login()" class="w-full max-w-xs bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg">Googleでログイン</button>
-    </div>
-
-    <!-- アプリ本体 -->
-    <div id="app-shell" style="display:none;">
-        <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
-            <h1 class="text-lg font-black italic text-blue-600">Satoz Diary</h1>
+    <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
+        <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
+        <div class="flex items-center gap-3">
             <div id="realtime-clock" class="text-xs font-bold px-3 py-1 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
-        </header>
+        </div>
+    </header>
 
-        <main class="max-w-md mx-auto px-4">
-            <!-- 記録・予定 -->
-            <section id="home" class="view-section active">
-                <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400 shadow-sm">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="font-bold text-sm">今日の予定</h2>
-                        <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 追加</button>
-                    </div>
-                    <div id="todo-display-list" class="space-y-3"></div>
+    <main class="max-w-md mx-auto px-4">
+        
+        <!-- Home (記録・予定管理) -->
+        <section id="home" class="view-section active">
+            <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-bold text-sm">予定管理 (今日・明日連動)</h2>
+                    <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
                 </div>
-                <div id="category-grid" class="grid grid-cols-4 gap-3 mb-6"></div>
-                
-                <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
-                        <div onclick="closeInput()" class="cursor-pointer text-xl">×</div>
-                    </div>
+                <div id="todo-display-list" class="space-y-4"></div>
+            </div>
+            <div id="category-grid" class="grid grid-cols-4 gap-3 mb-6"></div>
+            <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
+                    <div onclick="closeInput()" class="cursor-pointer text-xl">×</div>
+                </div>
                 <div class="grid grid-cols-2 gap-2 mb-4 text-[10px] font-bold text-gray-400 uppercase">
                     <div>日付<input type="date" id="rec-date"></div>
                     <div>時刻<input type="time" id="rec-time"></div>
-                    </div>
-                    <div id="dynamic-fields" class="space-y-4"></div>
-                    <textarea id="rec-comment" placeholder="メモを一言" rows="2" class="mt-4 w-full text-xs"></textarea>
-                    <div id="calorie-preview" class="hidden mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-200">
+                </div>
+                <div id="dynamic-fields" class="space-y-4"></div>
+                <textarea id="rec-comment" placeholder="一言メモ（任意）" rows="2" class="mt-4 w-full text-xs"></textarea>
+                <div id="calorie-preview" class="hidden mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-200">
                     <p class="text-[10px] font-bold text-orange-500 uppercase">カロリー計算</p>
                     <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
                 </div>
-                    <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg">同期して保存</button>
-                </div>
-                 <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2">＋ カテゴリー追加</button>
+                <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">サーバーへ保存</button>
+            </div>
+            <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2">＋ カテゴリー追加</button>
         </section>
 
             <!-- タイムライン -->
