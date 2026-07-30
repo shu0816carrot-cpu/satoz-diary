@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary v13.1 Sync</title>
+    <title>Satoz Diary v13.1 Cloud Complete</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
-    <!-- Firebase SDK -->
+
+    <!-- Firebase SDK (Auth & Firestore) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -26,215 +27,629 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        // 外部からFirebaseを操作する窓口
+        // アプリ全体から呼び出せるクラウド同期インターフェース
         window.cloud = {
             login: () => signInWithPopup(auth, provider),
             logout: () => signOut(auth),
-            // 全データをサーバーに保存
-            saveAllData: async (uid, data) => {
-                await setDoc(doc(db, "users", uid), data);
+            // ユーザー個別の全データをクラウドへ保存
+            saveAllUserData: async (uid, data) => {
+                try {
+                    await setDoc(doc(db, "users", uid), data);
+                } catch(e) {
+                    console.error("User data save error:", e);
+                }
             },
-            // 投稿をタイムラインに送る
-            postTimeline: async (post) => {
-                await addDoc(collection(db, "timeline"), { ...post, createdAt: Date.now() });
+            // ユーザー個別のデータをクラウドから取得
+            getUserData: async (uid) => {
+                try {
+                    const snap = await getDoc(doc(db, "users", uid));
+                    return snap.exists() ? snap.data() : null;
+                } catch(e) {
+                    console.error("User data fetch error:", e);
+                    return null;
+                }
+            },
+            // タイムライン(全ユーザー共通フィード)への投稿
+            postTimeline: async (postData) => {
+                try {
+                    await addDoc(collection(db, "timeline"), {
+                        ...postData,
+                        createdAt: Date.now()
+                    });
+                } catch(e) {
+                    console.error("Timeline post error:", e);
+                }
+            },
+            // タイムラインのリアルタイム監視
+            listenTimeline: (callback) => {
+                const q = query(collection(db, "timeline"), orderBy("createdAt", "desc"), limit(40));
+                return onSnapshot(q, (snapshot) => {
+                    const posts = snapshot.docs.map(doc => doc.data());
+                    callback(posts);
+                });
             }
         };
 
-        // ログイン状態の監視
+        // 認証状態の監視・データ同期制御
         onAuthStateChanged(auth, async (user) => {
+            const loginScreen = document.getElementById('login-screen');
+            const appShell = document.getElementById('app-shell');
+
             if (user) {
-                console.log("Logged in as:", user.displayName);
-                // サーバーからデータを取得
-                const docSnap = await getDoc(doc(db, "users", user.uid));
-                if (docSnap.exists()) {
-                    window.dbData = docSnap.data();
-                } else {
-                    // 初回ログイン時は初期データを作成
-                    window.dbData.user.name = user.displayName;
-                    window.dbData.user.id = user.uid;
-                    window.dbData.user.avatar = user.photoURL;
+                // ログイン成功時
+                console.log("Logged in as:", user.displayName, user.uid);
+                
+                // クラウドからユーザーデータを読み込む
+                const cloudData = await window.cloud.getUserData(user.uid);
+                if (cloudData) {
+                    window.dbData = cloudData;
                 }
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('app-shell').style.display = 'block';
+                
+                // ユーザー情報の最新化
+                window.dbData.user.name = user.displayName || window.dbData.user.name || "User";
+                window.dbData.user.id = user.uid;
+                window.dbData.user.avatar = user.photoURL || window.dbData.user.avatar;
+                window.dbData.user.email = user.email || "";
+
+                // 初回ログインまたはデータ更新を保存
+                saveLocal();
+                await window.cloud.saveAllUserData(user.uid, window.dbData);
+
+                loginScreen.style.display = 'none';
+                appShell.style.display = 'block';
+
                 initApp();
-                listenTimeline();
+                window.cloud.listenTimeline((posts) => {
+                    renderTimeline(posts);
+                });
             } else {
-                document.getElementById('login-screen').style.display = 'flex';
-                document.getElementById('app-shell').style.display = 'none';
+                // 未ログイン時
+                loginScreen.style.display = 'flex';
+                appShell.style.display = 'none';
             }
         });
-
-        // 共通タイムラインの監視
-        function listenTimeline() {
-            const q = query(collection(db, "timeline"), orderBy("createdAt", "desc"), limit(30));
-            onSnapshot(q, (snapshot) => {
-                const posts = snapshot.docs.map(doc => doc.data());
-                renderTimeline(posts);
-            });
-        }
     </script>
 
+    <!-- Tailwind CSS / Chart.js / Bootstrap Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
     <style>
         :root { --apple-bg: #f5f5f7; --apple-card: rgba(255, 255, 255, 0.85); --apple-text: #1d1d1f; --apple-accent: #0071e3; --glass: blur(25px) saturate(180%); }
         [data-theme="dark"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; }
-        body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, sans-serif; padding-bottom: 100px; transition: 0.3s; overflow-x: hidden; }
-        .glass-card { background: var(--apple-card); backdrop-filter: var(--glass); border-radius: 22px; border: 1px solid rgba(120, 120, 120, 0.1); }
+        @media (prefers-color-scheme: dark) { [data-theme="auto"] { --apple-bg: #000000; --apple-card: rgba(28, 28, 30, 0.85); --apple-text: #f5f5f7; --apple-accent: #0a84ff; } }
+        body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-bottom: 110px; transition: 0.3s; overflow-x: hidden; }
+        .glass-card { background: var(--apple-card); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); border-radius: 22px; border: 1px solid rgba(120, 120, 120, 0.1); }
         .view-section { display: none; }
         .view-section.active { display: block; animation: slideUp 0.4s ease-out; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 85px; background: var(--apple-card); backdrop-filter: blur(25px); border-top: 0.5px solid rgba(120,120,120,0.2); display: flex; align-items: center; z-index: 9999; }
-        .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 8px; font-weight: bold; background: none; }
+        .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 9px; font-weight: bold; background: none; border: none; cursor: pointer; }
         .nav-item.active { color: var(--apple-accent); }
+        input, select, textarea { background: rgba(120,120,120,0.1); border: none; border-radius: 12px; padding: 12px; color: inherit; outline: none; }
+        .chip { white-space: nowrap; font-size: 10px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(120,120,120,0.1); }
+        .chip.active { background: var(--apple-accent); color: white; }
+        .todo-title { font-size: 15px; font-weight: 800; }
+        .todo-memo { font-size: 11px; font-weight: 500; color: #0071e3; }
+        .todo-checked { opacity: 0.4; text-decoration: line-through; }
+        .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
+        .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
+        .val-input { font-size: 14px; width: 60px; text-align: center; border-bottom: 1px solid var(--apple-accent); }
     </style>
 </head>
 <body>
 
-    <!-- ログイン画面 -->
-    <div id="login-screen" class="fixed inset-0 z-[10000] bg-white dark:bg-black flex flex-col items-center justify-center text-center p-10">
-        <h1 class="text-4xl font-black text-blue-600 mb-2">Satoz Diary</h1>
-        <p class="text-gray-400 mb-10">スマホとPCでデータを同期</p>
-        <button onclick="window.cloud.login()" class="w-full max-w-xs bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg">Googleでログイン</button>
+    <!-- 1. Google ログイン画面 -->
+    <div id="login-screen" class="fixed inset-0 z-[10000] bg-white dark:bg-black flex flex-col items-center justify-center text-center p-8">
+        <div class="glass-card p-8 max-w-sm w-full shadow-2xl flex flex-col items-center">
+            <div class="w-16 h-16 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-4 text-3xl font-black italic">S</div>
+            <h1 class="text-3xl font-black italic text-blue-600 mb-2">Satoz Diary</h1>
+            <p class="text-xs text-gray-400 mb-8 font-medium">スマホとPCでデータをリアルタイム同期</p>
+            
+            <button onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95">
+                <i class="bi bi-google text-lg"></i>
+                <span>Googleでログイン</span>
+            </button>
+            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v13.1</p>
+        </div>
     </div>
 
-    <!-- アプリ本体 -->
+    <!-- 2. アプリ本体 -->
     <div id="app-shell" style="display:none;">
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
-            <h1 class="text-lg font-black italic text-blue-600">Satoz Diary</h1>
-            <div id="realtime-clock" class="text-xs font-bold px-3 py-1 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
+            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
+            <div class="flex items-center gap-3">
+                <div id="realtime-clock" class="text-xs font-bold px-3 py-1 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
+            </div>
         </header>
 
         <main class="max-w-md mx-auto px-4">
-            <!-- 記録・予定 -->
+            
+            <!-- Home (記録・予定管理) -->
             <section id="home" class="view-section active">
-                <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400 shadow-sm">
+                <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400">
                     <div class="flex justify-between items-center mb-4">
-                        <h2 class="font-bold text-sm">今日の予定</h2>
-                        <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 追加</button>
+                        <h2 class="font-bold text-sm">予定管理 (今日・明日連動)</h2>
+                        <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
                     </div>
-                    <div id="todo-display-list" class="space-y-3"></div>
+                    <div id="todo-display-list" class="space-y-4"></div>
                 </div>
+
                 <div id="category-grid" class="grid grid-cols-4 gap-3 mb-6"></div>
-                
+
                 <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
                     <div class="flex justify-between items-center mb-4">
                         <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
-                        <div onclick="closeInput()" class="cursor-pointer text-xl">×</div>
+                        <div onclick="closeInput()" class="cursor-pointer text-xl font-bold">×</div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mb-4 text-[10px] font-bold text-gray-400 uppercase">
+                        <div>日付<input type="date" id="rec-date" class="w-full mt-1"></div>
+                        <div>時刻<input type="time" id="rec-time" class="w-full mt-1"></div>
                     </div>
                     <div id="dynamic-fields" class="space-y-4"></div>
-                    <textarea id="rec-comment" placeholder="メモを一言" rows="2" class="mt-4 w-full text-xs"></textarea>
-                    <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg">同期して保存</button>
+                    <textarea id="rec-comment" placeholder="一言メモ（任意）" rows="2" class="mt-4 w-full text-xs"></textarea>
+                    
+                    <div id="calorie-preview" class="hidden mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-200">
+                        <p class="text-[10px] font-bold text-orange-500 uppercase">カロリー計算</p>
+                        <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
+                    </div>
+                    
+                    <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
+                </div>
+                
+                <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2">＋ カテゴリー追加</button>
+            </section>
+
+            <!-- Timeline (Firebase連動) -->
+            <section id="timeline" class="view-section">
+                <h2 class="text-xl font-black mb-6 italic text-blue-600">Global Feed</h2>
+                <div id="feed-list" class="space-y-4">読み込み中...</div>
+            </section>
+
+            <!-- Results (合計・前日比表示) -->
+            <section id="results" class="view-section">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-black italic">Results</h2>
+                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="renderResultsView()">
+                </div>
+                <div id="result-sum-grid" class="grid grid-cols-2 gap-3 mb-6"></div>
+                <div class="glass-card p-4">
+                    <h3 class="text-xs font-bold text-gray-400 mb-2 uppercase italic">Achievement List</h3>
+                    <div id="result-todo-list" class="space-y-2"></div>
                 </div>
             </section>
 
-            <!-- タイムライン -->
-            <section id="timeline" class="view-section">
-                <h2 class="text-xl font-black mb-6 italic text-blue-600">Timeline</h2>
-                <div id="feed-list" class="space-y-4"></div>
+            <!-- Rankings -->
+            <section id="ranking" class="view-section">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-black italic">Rankings</h2>
+                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
+                </div>
+                <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
+                <div id="ranking-display" class="glass-card overflow-hidden"></div>
             </section>
 
-            <!-- 結果、順位、本人セクションはVer11と同じロジックをJSに含めています -->
+            <!-- Profile -->
+            <section id="profile" class="view-section">
+                <div id="profile-header-area"></div>
+                <div class="glass-card p-6 mb-6 text-center">
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Time Allocation (24h)</h3>
+                    <canvas id="profilePieChart"></canvas>
+                </div>
+                <div class="glass-card p-6 mb-6">
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-4 text-center">Weekly Statistics</h3>
+                    <canvas id="profileBarChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Settings -->
+            <section id="settings" class="view-section">
+                <h2 class="text-xl font-bold mb-6 text-center">Settings</h2>
+                <div class="glass-card p-5 space-y-4">
+                    <div class="flex flex-col items-center gap-2">
+                        <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
+                        <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
+                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="handleFile(event)">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">名前</label>
+                        <input type="text" id="set-name" class="w-full mt-1">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">ユーザーID (UID)</label>
+                        <input type="text" id="set-id" class="w-full mt-1 opacity-70" readonly>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">体重(kg)</label>
+                            <input type="number" id="set-weight" class="w-full mt-1">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">身長(cm)</label>
+                            <input type="number" id="set-height" class="w-full mt-1">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">年齢</label>
+                            <input type="number" id="set-age" class="w-full mt-1">
+                        </div>
+                    </div>
+                    <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">設定をクラウドへ保存</button>
+                    <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2">ログアウト</button>
+                </div>
+            </section>
         </main>
 
+        <!-- タブバー -->
         <nav class="tab-bar">
             <button onclick="showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
             <button onclick="showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
             <button onclick="showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
             <button onclick="showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
             <button onclick="showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
+            <button onclick="showSection('settings')" class="nav-item"><i class="bi bi-gear text-lg"></i><div>設定</div></button>
         </nav>
     </div>
 
+    <!-- アプリのメイン JavaScript ロジック -->
     <script>
-        // --- データ管理エンジン ---
-        window.dbData = {
-            user: { name: "", id: "", avatar: null, weight: 65, height: 170, age: 20 },
+        // データモデル初期化
+        window.dbData = JSON.parse(localStorage.getItem('sz_v11_db') || JSON.stringify({
+            user: { name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null },
             records: [],
             todos: [],
             cats: []
-        };
+        }));
 
         const baseCats = [
-            { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', unit:'時間' },
-            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', unit:'km' },
-            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', unit:'kg' }
+            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
+            { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
+            { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0 },
+            { id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0 },
+            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
+            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
+            { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
         ];
 
+        let currentCatId = '', rankCatId = 'study';
+
+        // アプリケーション初期化
         function initApp() {
+            const u = window.dbData.user;
+            document.getElementById('set-name').value = u.name || '';
+            document.getElementById('set-id').value = u.id || '';
+            document.getElementById('set-weight').value = u.weight || 65;
+            document.getElementById('set-height').value = u.height || 170;
+            document.getElementById('set-age').value = u.age || 20;
+            document.getElementById('set-avatar-preview').src = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`;
+            
+            document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('rank-date').value = new Date().toISOString().split('T')[0];
+
             renderCategories();
             renderAll();
+            renderResultsView();
+
             setInterval(() => {
-                document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('ja-JP');
+                const clock = document.getElementById('realtime-clock');
+                if (clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
             }, 1000);
+        }
+
+        // 記録保存 (ローカル + Firebase Cloud Sync)
+        async function saveRecord() {
+            const memo = document.getElementById('rec-comment').value.trim();
+            const date = document.getElementById('rec-date').value;
+            const time = document.getElementById('rec-time').value;
+            let val = 0;
+            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === currentCatId);
+
+            if (currentCatId === 'schedule') {
+                const task = document.getElementById('v_task_todo').value;
+                if (!task) return alert("予定内容を入力してください");
+                const sel = document.getElementById('todo-date-sel').value;
+                const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate() + 1)).toISOString().split('T')[0];
+                window.dbData.todos.push({ id: Date.now(), time, task, memo, done: false, date: targetDate });
+            } else {
+                if (cat.type === 'time' || cat.type === 'run') {
+                    val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
+                } else if (currentCatId === 'sleep') {
+                    const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
+                    const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
+                    val = (e - s) / 3600000;
+                    if (val < 0) val += 24;
+                } else if (currentCatId === 'diary') {
+                    val = memo.length;
+                } else {
+                    val = parseFloat(document.getElementById('v1')?.value || 0);
+                }
+                
+                if (currentCatId === 'weight') window.dbData.user.weight = val;
+
+                const valDispStr = (cat.type === 'time' || cat.type === 'run' || cat.type === 'sleep') ? formatTime(val) : `${val.toFixed(1)} ${cat.unit}`;
+                const post = {
+                    id: Date.now(),
+                    catId: currentCatId,
+                    catName: cat ? cat.name : "記録",
+                    val: val,
+                    valDisp: valDispStr,
+                    date: date,
+                    time: time,
+                    comment: memo,
+                    userName: window.dbData.user.name,
+                    userAvatar: window.dbData.user.avatar
+                };
+
+                window.dbData.records.unshift(post);
+
+                // 1. Firebase タイムラインに送信
+                if (window.cloud && window.cloud.postTimeline) {
+                    await window.cloud.postTimeline(post);
+                }
+            }
+
+            // 2. ローカル & Firestore 全データ保存
+            saveLocal();
+            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            }
+
+            closeInput();
+            alert("クラウドへ正常に保存・同期されました！");
+        }
+
+        function saveLocal() {
+            localStorage.setItem('sz_v11_db', JSON.stringify(window.dbData));
+            renderAll();
+        }
+
+        // ホーム画面の描画
+        function renderAll() {
+            const today = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
+            
+            // ToDoリスト描画 (今日・明日)
+            const todoContainer = document.getElementById('todo-display-list');
+            if (todoContainer) {
+                todoContainer.innerHTML = `
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">TODAY (${today})</p>
+                    ${window.dbData.todos.filter(t => t.date === today).map(t => `
+                        <div class="flex items-start gap-3 p-3 bg-white/40 dark:bg-white/5 rounded-xl shadow-sm">
+                            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})" class="mt-1">
+                            <div>
+                                <p class="todo-title ${t.done ? 'todo-checked' : ''}">${t.task}</p>
+                                ${t.memo ? `<p class="todo-memo">${t.memo}</p>` : ''}
+                            </div>
+                        </div>
+                    `).join('') || '<p class="text-center text-xs opacity-30 py-2">今日の予定はありません</p>'}
+
+                    <p class="text-[10px] font-bold text-gray-400 mt-4 uppercase tracking-wider">TOMORROW (${tomorrow})</p>
+                    ${window.dbData.todos.filter(t => t.date === tomorrow).map(t => `
+                        <div class="p-3 bg-white/10 rounded-xl opacity-60">
+                            <p class="todo-title">${t.task}</p>
+                        </div>
+                    `).join('') || '<p class="text-center text-xs opacity-30 py-2">明日の予定はありません</p>'}
+                `;
+            }
         }
 
         function renderCategories() {
             const grid = document.getElementById('category-grid');
-            grid.innerHTML = baseCats.map(c => `<button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center"><i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i><span class="text-[9px] font-bold">${c.name}</span></button>`).join('');
-        }
-
-        function openInput(id) {
-            window.currentCatId = id;
-            document.getElementById('input-area').classList.remove('hidden');
-            document.getElementById('input-title').innerText = id;
-            const fields = document.getElementById('dynamic-fields');
-            fields.innerHTML = '<input type="number" id="v1" placeholder="数値を入力" class="w-full">';
-        }
-
-        function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
-
-        async function saveRecord() {
-            const val = parseFloat(document.getElementById('v1').value || 0);
-            const memo = document.getElementById('rec-comment').value;
-            const date = new Date().toISOString().split('T')[0];
-
-            const newRecord = {
-                userName: window.dbData.user.name,
-                catId: window.currentCatId,
-                val: val,
-                comment: memo,
-                date: date,
-                time: new Date().toLocaleTimeString('ja-JP')
-            };
-
-            // 1. ローカルデータを更新
-            window.dbData.records.unshift(newRecord);
-
-            // 2. サーバー（Firestore）に保存
-            if (window.cloud) {
-                // ユーザー個別の全データを同期
-                await window.cloud.saveAllData(window.dbData.user.id, window.dbData);
-                // タイムラインにも流す
-                await window.cloud.postTimeline(newRecord);
+            if (grid) {
+                grid.innerHTML = baseCats.map(c => `
+                    <button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center hover:scale-105 transition">
+                        <i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i>
+                        <span class="text-[9px] font-bold">${c.name}</span>
+                    </button>
+                `).join('');
             }
-
-            closeInput();
-            renderAll();
-            alert("クラウドと同期しました！");
         }
 
+        // タイムライン描画 (Firebaseリアルタイム受信時)
         function renderTimeline(posts) {
             const list = document.getElementById('feed-list');
+            if (!list) return;
+
+            if (posts.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400 text-xs py-8">投稿がありません</p>`;
+                return;
+            }
+
             list.innerHTML = posts.map(p => `
-                <div class="glass-card p-4">
-                    <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catId}・${p.userName}</p>
-                    <p class="text-sm font-bold">${p.val} ${p.comment}</p>
-                    <p class="text-[8px] text-gray-400 mt-1">${p.date} ${p.time}</p>
-                </div>`).join('');
+                <div class="glass-card p-4 text-left shadow-sm">
+                    <div class="flex items-center gap-2 mb-2">
+                        <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-6 h-6 rounded-full object-cover">
+                        <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName || '記録'}・${p.userName || '匿名'}</p>
+                    </div>
+                    <p class="todo-title">${p.valDisp}</p>
+                    ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
+                    <p class="text-[8px] text-gray-400 mt-2">${p.date || ''} ${p.time || ''}</p>
+                </div>
+            `).join('');
         }
 
-        function renderAll() {
-            const d = new Date().toISOString().split('T')[0];
-            document.getElementById('todo-display-list').innerHTML = window.dbData.todos.filter(t=>t.date===d).map(t => `<div class="flex gap-2 text-xs"><input type="checkbox"> <b>${t.time}</b> ${t.task}</div>`).join('');
+        // 結果画面の描画 (合計 ＆ 前日比)
+        function renderResultsView() {
+            const date = document.getElementById('results-date').value;
+            const prev = new Date(new Date(date).setDate(new Date(date).getDate() - 1)).toISOString().split('T')[0];
+            const all = [...baseCats, ...(window.dbData.cats || [])];
+            
+            const grid = document.getElementById('result-sum-grid');
+            if (grid) {
+                grid.innerHTML = all.filter(c => c.type !== 'todo').map(c => {
+                    const curRecs = window.dbData.records.filter(r => r.date === date && r.catId === c.id);
+                    const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s, a) => s + a.val, 0);
+                    
+                    const oldRecs = window.dbData.records.filter(r => r.date === prev && r.catId === c.id);
+                    const old = (c.id === 'weight') ? (oldRecs[0]?.val || 0) : oldRecs.reduce((s, a) => s + a.val, 0);
+                    const diff = cur - old;
+                    
+                    let valDisp = (c.type === 'time' || c.type === 'run' || c.type === 'sleep') ? formatTime(cur) : `${cur.toFixed(1)}${c.unit}`;
+                    if (c.type === 'diary') valDisp = `${cur}文字`;
+                    const diffH = cur === 0 ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
+                    
+                    return cur > 0 ? `
+                        <div class="glass-card p-3 text-center">
+                            <p class="text-[8px] font-bold text-gray-400 uppercase">${c.name}</p>
+                            <p class="text-sm font-black text-blue-600">${valDisp}</p>
+                            ${diffH}
+                        </div>
+                    ` : '';
+                }).join('') || `<p class="col-span-2 text-center text-xs text-gray-400 py-4">この日の記録はありません</p>`;
+            }
+
+            const todoList = document.getElementById('result-todo-list');
+            if (todoList) {
+                todoList.innerHTML = window.dbData.todos.filter(t => t.date === date && t.done).map(t => `
+                    <div class="p-2 bg-green-50 dark:bg-green-900/20 text-[10px] rounded-lg text-green-700 dark:text-green-300 font-bold">✓ ${t.task}</div>
+                `).join('') || `<p class="text-center text-xs text-gray-400">達成した予定はありません</p>`;
+            }
+        }
+
+        // 入力ダイアログ開閉
+        function openInput(id) {
+            currentCatId = id;
+            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === id);
+            document.getElementById('input-area').classList.remove('hidden');
+            document.getElementById('input-title').innerText = cat ? cat.name : "予定";
+            document.getElementById('rec-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('rec-time').value = new Date().toTimeString().slice(0, 5);
+            
+            const fields = document.getElementById('dynamic-fields');
+            fields.innerHTML = '';
+            document.getElementById('calorie-preview').classList.add('hidden');
+
+            if (id === 'study' || id === 'exercise' || id === 'run') {
+                if (id === 'run') {
+                    fields.innerHTML = `<input type="number" id="v_dist" placeholder="距離(km)" class="w-full mb-2" oninput="updatePreCal()">`;
+                }
+                fields.innerHTML += `
+                    <div class="flex gap-2 justify-center items-center">
+                        <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
+                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
+                    </div>`;
+                document.getElementById('calorie-preview').classList.remove('hidden');
+            } else if (id === 'sleep') {
+                fields.innerHTML = `
+                    <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
+                        <div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}" class="w-full mt-1"></div>
+                        <div>時刻<input type="time" id="sleep_s_time" value="23:00" class="w-full mt-1"></div>
+                        <div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}" class="w-full mt-1"></div>
+                        <div>時刻<input type="time" id="sleep_e_time" value="07:00" class="w-full mt-1"></div>
+                    </div>`;
+            } else if (id === 'schedule') {
+                fields.innerHTML = `
+                    <select id="todo-date-sel" class="w-full mb-2">
+                        <option value="today">今日</option>
+                        <option value="tomorrow">明日</option>
+                    </select>
+                    <input type="text" id="v_task_todo" placeholder="予定内容 (例: 買い物)" class="w-full">`;
+            } else {
+                fields.innerHTML = `<input type="number" id="v1" placeholder="${cat ? cat.unit : ''}を入力" class="w-full">`;
+            }
+        }
+
+        function closeInput() {
+            document.getElementById('input-area').classList.add('hidden');
+        }
+
+        function toggleTodo(id) {
+            const t = window.dbData.todos.find(x => x.id === id);
+            if (t) {
+                t.done = !t.done;
+                saveLocal();
+                if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                    window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                }
+            }
+        }
+
+        function updatePreCal() {
+            const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
+            const m = parseFloat(document.getElementById('v_mins')?.value || 0);
+            const cat = baseCats.find(c => c.id === currentCatId);
+            if (cat && cat.mets) {
+                const cal = Math.round(cat.mets * (window.dbData.user.weight || 65) * (h + m / 60) * 1.05);
+                document.getElementById('cal-val').innerText = `${cal} kcal`;
+            }
+        }
+
+        function formatTime(h) {
+            const hr = Math.floor(h);
+            const mn = Math.round((h - hr) * 60);
+            return hr > 0 ? `${hr}h ${mn}m` : `${mn}m`;
         }
 
         function showSection(id) {
             document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            
+            if (id === 'ranking') updateRankList(rankCatId);
+            if (id === 'results') renderResultsView();
+            if (id === 'profile') renderProfilePage();
+            
+            renderAll();
+        }
+
+        async function saveSettings() {
+            window.dbData.user.name = document.getElementById('set-name').value;
+            window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
+            window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
+            window.dbData.user.age = parseInt(document.getElementById('set-age').value || 20);
+            
+            saveLocal();
+            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            }
+            alert("設定を保存し、クラウドと同期しました！");
+        }
+
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => {
+                window.dbData.user.avatar = ev.target.result;
+                document.getElementById('set-avatar-preview').src = ev.target.result;
+                saveLocal();
+            };
+            r.readAsDataURL(file);
+        }
+
+        function renderProfilePage() {
+            const u = window.dbData.user;
+            const area = document.getElementById('profile-header-area');
+            if (area) {
+                area.innerHTML = `
+                    <div class="glass-card p-6 mb-6 flex flex-col items-center text-center">
+                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.name)}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover">
+                        <h2 class="text-xl font-black mt-4">${u.name}</h2>
+                        <p class="text-[10px] text-gray-400">UID: ${u.id}</p>
+                    </div>`;
+            }
+        }
+
+        function updateRankList(id) {
+            rankCatId = id;
+            const filters = document.getElementById('rank-filters');
+            if (filters) {
+                filters.innerHTML = baseCats.filter(c => c.type !== 'todo').map(c => `
+                    <button onclick="updateRankList('${c.id}')" class="chip ${rankCatId === c.id ? 'active' : ''}">${c.name}</button>
+                `).join('');
+            }
+            
+            const myV = window.dbData.records.filter(r => r.catId === id).reduce((s, a) => s + a.val, 0);
+            const display = document.getElementById('ranking-display');
+            if (display) {
+                display.innerHTML = `
+                    <div class="flex items-center p-4 bg-white/50 dark:bg-white/5">
+                        <span class="w-8 font-black text-yellow-500">1</span>
+                        <span class="flex-1 font-bold text-sm">${window.dbData.user.name} (あなた)</span>
+                        <span class="font-black text-blue-600 text-xs">${myV.toFixed(1)}</span>
+                    </div>`;
+            }
         }
     </script>
 </body>
