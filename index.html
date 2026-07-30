@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary v13.1 Cloud Complete</title>
+    <title>Satoz Diary v13.2 Cloud Complete</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -27,40 +27,23 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        // アプリ全体から呼び出せるクラウド同期インターフェース
         window.cloud = {
             login: () => signInWithPopup(auth, provider),
             logout: () => signOut(auth),
-            // ユーザー個別の全データをクラウドへ保存
             saveAllUserData: async (uid, data) => {
-                try {
-                    await setDoc(doc(db, "users", uid), data);
-                } catch(e) {
-                    console.error("User data save error:", e);
-                }
+                try { await setDoc(doc(db, "users", uid), data); } catch(e) { console.error(e); }
             },
-            // ユーザー個別のデータをクラウドから取得
             getUserData: async (uid) => {
                 try {
                     const snap = await getDoc(doc(db, "users", uid));
                     return snap.exists() ? snap.data() : null;
-                } catch(e) {
-                    console.error("User data fetch error:", e);
-                    return null;
-                }
+                } catch(e) { console.error(e); return null; }
             },
-            // タイムライン(全ユーザー共通フィード)への投稿
             postTimeline: async (postData) => {
                 try {
-                    await addDoc(collection(db, "timeline"), {
-                        ...postData,
-                        createdAt: Date.now()
-                    });
-                } catch(e) {
-                    console.error("Timeline post error:", e);
-                }
+                    await addDoc(collection(db, "timeline"), { ...postData, createdAt: Date.now() });
+                } catch(e) { console.error(e); }
             },
-            // タイムラインのリアルタイム監視
             listenTimeline: (callback) => {
                 const q = query(collection(db, "timeline"), orderBy("createdAt", "desc"), limit(40));
                 return onSnapshot(q, (snapshot) => {
@@ -70,28 +53,18 @@
             }
         };
 
-        // 認証状態の監視・データ同期制御
         onAuthStateChanged(auth, async (user) => {
             const loginScreen = document.getElementById('login-screen');
             const appShell = document.getElementById('app-shell');
 
             if (user) {
-                // ログイン成功時
-                console.log("Logged in as:", user.displayName, user.uid);
-                
-                // クラウドからユーザーデータを読み込む
                 const cloudData = await window.cloud.getUserData(user.uid);
-                if (cloudData) {
-                    window.dbData = cloudData;
-                }
+                if (cloudData) window.dbData = cloudData;
                 
-                // ユーザー情報の最新化
                 window.dbData.user.name = user.displayName || window.dbData.user.name || "User";
                 window.dbData.user.id = user.uid;
                 window.dbData.user.avatar = user.photoURL || window.dbData.user.avatar;
-                window.dbData.user.email = user.email || "";
 
-                // 初回ログインまたはデータ更新を保存
                 saveLocal();
                 await window.cloud.saveAllUserData(user.uid, window.dbData);
 
@@ -99,11 +72,8 @@
                 appShell.style.display = 'block';
 
                 initApp();
-                window.cloud.listenTimeline((posts) => {
-                    renderTimeline(posts);
-                });
+                window.cloud.listenTimeline((posts) => renderTimeline(posts));
             } else {
-                // 未ログイン時
                 loginScreen.style.display = 'flex';
                 appShell.style.display = 'none';
             }
@@ -113,7 +83,6 @@
     <!-- Tailwind CSS / Chart.js / Bootstrap Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
     <style>
@@ -152,16 +121,20 @@
                 <i class="bi bi-google text-lg"></i>
                 <span>Googleでログイン</span>
             </button>
-            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v13.1</p>
+            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v13.2</p>
         </div>
     </div>
 
     <!-- 2. アプリ本体 -->
     <div id="app-shell" style="display:none;">
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
-            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-            <div class="flex items-center gap-3">
-                <div id="realtime-clock" class="text-xs font-bold px-3 py-1 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
+            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="showSection('home')">Satoz Diary</h1>
+            <!-- 右上エリア: 時計 ＆ 設定(歯車アイコン) -->
+            <div class="flex items-center gap-2">
+                <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
+                <button onclick="showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
+                    <i class="bi bi-gear-fill text-sm"></i>
+                </button>
             </div>
         </header>
 
@@ -281,20 +254,18 @@
             </section>
         </main>
 
-        <!-- タブバー -->
+        <!-- タブバー (設定を外して5つに整理) -->
         <nav class="tab-bar">
             <button onclick="showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
             <button onclick="showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
             <button onclick="showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
             <button onclick="showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
             <button onclick="showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
-            <button onclick="showSection('settings')" class="nav-item"><i class="bi bi-gear text-lg"></i><div>設定</div></button>
         </nav>
     </div>
 
     <!-- アプリのメイン JavaScript ロジック -->
     <script>
-        // データモデル初期化
         window.dbData = JSON.parse(localStorage.getItem('sz_v11_db') || JSON.stringify({
             user: { name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null },
             records: [],
@@ -314,7 +285,6 @@
 
         let currentCatId = '', rankCatId = 'study';
 
-        // アプリケーション初期化
         function initApp() {
             const u = window.dbData.user;
             document.getElementById('set-name').value = u.name || '';
@@ -337,12 +307,13 @@
             }, 1000);
         }
 
-        // 記録保存 (ローカル + Firebase Cloud Sync)
+        // 記録保存 (ランニング時は 距離(km) + 時間(分) を両方保持)
         async function saveRecord() {
             const memo = document.getElementById('rec-comment').value.trim();
             const date = document.getElementById('rec-date').value;
             const time = document.getElementById('rec-time').value;
             let val = 0;
+            let durationMin = 0; // 所要時間（分）
             const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === currentCatId);
 
             if (currentCatId === 'schedule') {
@@ -352,13 +323,21 @@
                 const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate() + 1)).toISOString().split('T')[0];
                 window.dbData.todos.push({ id: Date.now(), time, task, memo, done: false, date: targetDate });
             } else {
-                if (cat.type === 'time' || cat.type === 'run') {
+                if (currentCatId === 'run') {
+                    // ランニング: val = 距離(km), durationMin = 走った時間(分)
+                    val = parseFloat(document.getElementById('v_dist')?.value || 0);
+                    const hrs = parseFloat(document.getElementById('v_hrs')?.value || 0);
+                    const mins = parseFloat(document.getElementById('v_mins')?.value || 0);
+                    durationMin = Math.round(hrs * 60 + mins);
+                } else if (cat.type === 'time') {
                     val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
+                    durationMin = Math.round(val * 60);
                 } else if (currentCatId === 'sleep') {
                     const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
                     const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
                     val = (e - s) / 3600000;
                     if (val < 0) val += 24;
+                    durationMin = Math.round(val * 60);
                 } else if (currentCatId === 'diary') {
                     val = memo.length;
                 } else {
@@ -367,12 +346,20 @@
                 
                 if (currentCatId === 'weight') window.dbData.user.weight = val;
 
-                const valDispStr = (cat.type === 'time' || cat.type === 'run' || cat.type === 'sleep') ? formatTime(val) : `${val.toFixed(1)} ${cat.unit}`;
+                // タイムラインや一覧での表示文字列
+                let valDispStr = `${val.toFixed(1)} ${cat ? cat.unit : ''}`;
+                if (currentCatId === 'run') {
+                    valDispStr = `${val.toFixed(1)} km (${durationMin}分)`;
+                } else if (cat.type === 'time' || cat.type === 'sleep') {
+                    valDispStr = formatTime(val);
+                }
+
                 const post = {
                     id: Date.now(),
                     catId: currentCatId,
                     catName: cat ? cat.name : "記録",
                     val: val,
+                    durationMin: durationMin,
                     valDisp: valDispStr,
                     date: date,
                     time: time,
@@ -383,13 +370,11 @@
 
                 window.dbData.records.unshift(post);
 
-                // 1. Firebase タイムラインに送信
                 if (window.cloud && window.cloud.postTimeline) {
                     await window.cloud.postTimeline(post);
                 }
             }
 
-            // 2. ローカル & Firestore 全データ保存
             saveLocal();
             if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
                 await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
@@ -404,12 +389,10 @@
             renderAll();
         }
 
-        // ホーム画面の描画
         function renderAll() {
             const today = new Date().toISOString().split('T')[0];
             const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
             
-            // ToDoリスト描画 (今日・明日)
             const todoContainer = document.getElementById('todo-display-list');
             if (todoContainer) {
                 todoContainer.innerHTML = `
@@ -446,7 +429,6 @@
             }
         }
 
-        // タイムライン描画 (Firebaseリアルタイム受信時)
         function renderTimeline(posts) {
             const list = document.getElementById('feed-list');
             if (!list) return;
@@ -469,7 +451,7 @@
             `).join('');
         }
 
-        // 結果画面の描画 (合計 ＆ 前日比)
+        // Results（結果画面）描画: ランニングは「距離(km) (〇〇分)」で表示
         function renderResultsView() {
             const date = document.getElementById('results-date').value;
             const prev = new Date(new Date(date).setDate(new Date(date).getDate() - 1)).toISOString().split('T')[0];
@@ -480,13 +462,24 @@
                 grid.innerHTML = all.filter(c => c.type !== 'todo').map(c => {
                     const curRecs = window.dbData.records.filter(r => r.date === date && r.catId === c.id);
                     const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s, a) => s + a.val, 0);
+                    const curMins = curRecs.reduce((s, a) => s + (a.durationMin || 0), 0);
                     
                     const oldRecs = window.dbData.records.filter(r => r.date === prev && r.catId === c.id);
                     const old = (c.id === 'weight') ? (oldRecs[0]?.val || 0) : oldRecs.reduce((s, a) => s + a.val, 0);
                     const diff = cur - old;
                     
-                    let valDisp = (c.type === 'time' || c.type === 'run' || c.type === 'sleep') ? formatTime(cur) : `${cur.toFixed(1)}${c.unit}`;
-                    if (c.type === 'diary') valDisp = `${cur}文字`;
+                    let valDisp = '';
+                    if (c.id === 'run') {
+                        // ランニング: 青文字で距離(km) ＋ 隣に小文字で (何分)
+                        valDisp = `${cur.toFixed(1)} km <span class="text-[10px] text-gray-500 font-medium font-normal ml-0.5">(${curMins}分)</span>`;
+                    } else if (c.type === 'time' || c.type === 'sleep') {
+                        valDisp = formatTime(cur);
+                    } else if (c.type === 'diary') {
+                        valDisp = `${cur}文字`;
+                    } else {
+                        valDisp = `${cur.toFixed(1)} ${c.unit}`;
+                    }
+
                     const diffH = cur === 0 ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
                     
                     return cur > 0 ? `
@@ -507,7 +500,6 @@
             }
         }
 
-        // 入力ダイアログ開閉
         function openInput(id) {
             currentCatId = id;
             const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === id);
@@ -522,7 +514,7 @@
 
             if (id === 'study' || id === 'exercise' || id === 'run') {
                 if (id === 'run') {
-                    fields.innerHTML = `<input type="number" id="v_dist" placeholder="距離(km)" class="w-full mb-2" oninput="updatePreCal()">`;
+                    fields.innerHTML = `<input type="number" id="v_dist" placeholder="走った距離(km)" class="w-full mb-2" oninput="updatePreCal()">`;
                 }
                 fields.innerHTML += `
                     <div class="flex gap-2 justify-center items-center">
@@ -583,9 +575,14 @@
 
         function showSection(id) {
             document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
             
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            // ナビゲーションのハイライト
+            const navBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.getAttribute('onclick')?.includes(`'${id}'`));
+            if (navBtn) navBtn.classList.add('active');
+
             if (id === 'ranking') updateRankList(rankCatId);
             if (id === 'results') renderResultsView();
             if (id === 'profile') renderProfilePage();
@@ -631,8 +628,12 @@
             }
         }
 
+        // Rankings (ランキング) 描画: 全ての項目に単位(unit)を付加
         function updateRankList(id) {
             rankCatId = id;
+            const cat = baseCats.find(c => c.id === id);
+            const unitStr = cat ? cat.unit : '';
+
             const filters = document.getElementById('rank-filters');
             if (filters) {
                 filters.innerHTML = baseCats.filter(c => c.type !== 'todo').map(c => `
@@ -641,13 +642,22 @@
             }
             
             const myV = window.dbData.records.filter(r => r.catId === id).reduce((s, a) => s + a.val, 0);
+            
+            // 時間系カテゴリの場合のフォーマット調整
+            let valFormatted = `${myV.toFixed(1)} ${unitStr}`;
+            if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
+                valFormatted = `${formatTime(myV)}`;
+            } else if (cat && cat.type === 'diary') {
+                valFormatted = `${myV} 文字`;
+            }
+
             const display = document.getElementById('ranking-display');
             if (display) {
                 display.innerHTML = `
                     <div class="flex items-center p-4 bg-white/50 dark:bg-white/5">
                         <span class="w-8 font-black text-yellow-500">1</span>
                         <span class="flex-1 font-bold text-sm">${window.dbData.user.name} (あなた)</span>
-                        <span class="font-black text-blue-600 text-xs">${myV.toFixed(1)}</span>
+                        <span class="font-black text-blue-600 text-xs">${valFormatted}</span>
                     </div>`;
             }
         }
