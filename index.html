@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary v16.0 Group Custom Ranks</title>
+    <title>Satoz Diary v16.2 Instant Login Fixed</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -28,7 +28,26 @@
         const provider = new GoogleAuthProvider();
 
         window.cloud = {
-            login: () => signInWithPopup(auth, provider),
+            login: async () => {
+                if (window.location.protocol === 'file:') {
+                    alert("【動作エラーのお知らせ】\nHTMLファイルを直接ダブルクリック（file://）して開いているため、Googleログインが動作しません。\nhttp://localhost 等のWebサーバー経由でページを開いてください。");
+                    return;
+                }
+
+                try {
+                    console.log("Googleログインを開始します...");
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Firebase Login Error:", error);
+                    if (error.code === 'auth/unauthorized-domain') {
+                        alert("【Firebase設定エラー: 未承認ドメイン】\n現在お使いのドメイン（" + window.location.hostname + "）がFirebase Consoleで許可されていません。\n\nFirebase Console > Authentication > 設定 > 承認済みドメイン に「" + window.location.hostname + "」を追加してください。");
+                    } else if (error.code === 'auth/popup-blocked') {
+                        alert("【ポップアップブロック】\nブラウザの設定でポップアップを許可してください。");
+                    } else if (error.code !== 'auth/popup-closed-by-user') {
+                        alert("【ログインエラー】\n" + error.message);
+                    }
+                }
+            },
             logout: () => signOut(auth),
             saveAllUserData: async (uid, data) => {
                 try { 
@@ -53,6 +72,8 @@
                 return onSnapshot(q, (snapshot) => {
                     const posts = snapshot.docs.map(doc => doc.data());
                     callback(posts);
+                }, (error) => {
+                    console.warn("Timeline listen warning:", error);
                 });
             },
             createGroup: async (groupName, user) => {
@@ -78,29 +99,47 @@
             }
         };
 
+        // ログイン状態監視・画面切り替えの修正
         onAuthStateChanged(auth, async (user) => {
             const loginScreen = document.getElementById('login-screen');
             const appShell = document.getElementById('app-shell');
 
             if (user) {
-                const cloudData = await window.cloud.getUserData(user.uid);
-                if (cloudData) window.dbData = cloudData;
+                console.log("ログイン検知: 即座に画面を切り替えます", user.displayName);
                 
-                window.dbData.user.name = window.dbData.user.name || user.displayName || "User";
-                window.dbData.user.id = user.uid;
-                window.dbData.user.avatar = window.dbData.user.avatar || user.photoURL;
-
-                saveLocal();
-                await window.cloud.saveAllUserData(user.uid, window.dbData);
-
+                // 1. まず最優先でアプリ画面を表示
                 loginScreen.style.display = 'none';
                 appShell.style.display = 'block';
 
+                // 基本情報をセット
+                window.dbData.user.name = user.displayName || window.dbData.user.name || "User";
+                window.dbData.user.id = user.uid;
+                window.dbData.user.avatar = user.photoURL || window.dbData.user.avatar;
+
                 initApp();
-                window.cloud.listenTimeline((posts) => {
-                    window.allPosts = posts;
-                    renderTimeline();
-                });
+
+                // 2. バックグラウンドでクラウドデータの同期を行う
+                try {
+                    const cloudData = await window.cloud.getUserData(user.uid);
+                    if (cloudData) {
+                        window.dbData = { ...window.dbData, ...cloudData };
+                        saveLocal();
+                        initApp(); // クラウドデータ反映後に再描画
+                    }
+                    await window.cloud.saveAllUserData(user.uid, window.dbData);
+                } catch(e) {
+                    console.warn("クラウドデータ取得同期スキップ (ローカルデータで動作中):", e);
+                }
+
+                // 3. タイムラインの受信を開始
+                try {
+                    window.cloud.listenTimeline((posts) => {
+                        window.allPosts = posts;
+                        renderTimeline();
+                    });
+                } catch(e) {
+                    console.warn("タイムライン受信エラー:", e);
+                }
             } else {
                 loginScreen.style.display = 'flex';
                 appShell.style.display = 'none';
@@ -155,7 +194,7 @@
                 <i class="bi bi-google text-lg"></i>
                 <span>Googleでログイン</span>
             </button>
-            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v16.0</p>
+            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v16.2</p>
         </div>
     </div>
 
@@ -165,149 +204,4 @@
             <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="showSection('home')">Satoz Diary</h1>
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
-                <button onclick="showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
-                    <i class="bi bi-gear-fill text-sm"></i>
-                </button>
-            </div>
-        </header>
-
-        <main class="max-w-md mx-auto px-4">
-            
-            <!-- Home (記録・予定管理) -->
-            <section id="home" class="view-section active">
-                <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="font-bold text-sm">予定管理 (今日・明日連動)</h2>
-                        <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
-                    </div>
-                    <div id="todo-display-list" class="space-y-4"></div>
-                </div>
-
-                <div id="category-grid" class="grid grid-cols-4 gap-3 mb-6"></div>
-
-                <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
-                        <div onclick="closeInput()" class="cursor-pointer text-xl font-bold">×</div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 mb-4 text-[10px] font-bold text-gray-400 uppercase">
-                        <div>日付<input type="date" id="rec-date" class="w-full mt-1"></div>
-                        <div>時刻<input type="time" id="rec-time" class="w-full mt-1"></div>
-                    </div>
-
-                    <div id="dynamic-fields" class="space-y-4"></div>
-
-                    <div class="mt-4">
-                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="handleRecPhotoSelect(event)">
-                        <button type="button" onclick="document.getElementById('rec-photo-input').click()" class="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-xl flex items-center gap-1.5">
-                            <i class="bi bi-camera-fill"></i>
-                            <span>📷 写真を追加</span>
-                        </button>
-                        <div id="rec-photo-preview-box" class="hidden relative mt-2 w-24 h-24">
-                            <img id="rec-photo-preview-img" class="w-24 h-24 rounded-xl object-cover border-2 border-blue-500/30">
-                            <button type="button" onclick="clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
-                        </div>
-                    </div>
-
-                    <textarea id="rec-comment" placeholder="一言メモ（任意）" rows="2" class="mt-4 w-full text-xs"></textarea>
-                    
-                    <div id="calorie-preview" class="hidden mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-200">
-                        <p class="text-[10px] font-bold text-orange-500 uppercase">カロリー計算</p>
-                        <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
-                    </div>
-                    
-                    <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
-                </div>
-                
-                <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2 hover:bg-black/5 transition">＋ カテゴリー追加</button>
-            </section>
-
-            <!-- カテゴリー追加画面 -->
-            <section id="cat-maker" class="view-section">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-black italic">カテゴリー追加</h2>
-                    <button onclick="showSection('home')" class="text-xs font-bold text-gray-400">戻る</button>
-                </div>
-                <div class="glass-card p-6 space-y-4">
-                    <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">カテゴリー名</label>
-                        <input type="text" id="new-cat-name" placeholder="例: 読書, 水分補給, ピアノ" class="w-full mt-1">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-2 block">アイコンの選択</label>
-                        <div id="icon-picker" class="grid grid-cols-6 gap-2"></div>
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">単位の選択</label>
-                        <select id="new-cat-unit-type" class="w-full mt-1" onchange="toggleCustomUnit(this.value)">
-                            <option value="time">時間 (h / m)</option>
-                            <option value="kcal">カロリー (kcal)</option>
-                            <option value="kg">体重・重量 (kg)</option>
-                            <option value="km">距離 (km)</option>
-                            <option value="文字">文字数 (文字)</option>
-                            <option value="回">回数 (回)</option>
-                            <option value="custom">その他 (自由入力)</option>
-                        </select>
-                    </div>
-                    <div id="custom-unit-box" class="hidden">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">単位を入力</label>
-                        <input type="text" id="new-cat-custom-unit" placeholder="例: ページ, ml, 錠" class="w-full mt-1">
-                    </div>
-                    <button onclick="createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">カテゴリーを作成</button>
-                </div>
-            </section>
-
-            <!-- Timeline (フィード) -->
-            <section id="timeline" class="view-section">
-                <div class="mb-4">
-                    <h2 class="text-xl font-black mb-3 italic text-blue-600">Feed</h2>
-                    <div id="tl-group-banner" class="flex gap-2 overflow-x-auto pb-2"></div>
-                </div>
-                <div id="feed-list" class="space-y-4">読み込み中...</div>
-            </section>
-
-            <!-- Results -->
-            <section id="results" class="view-section">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-black italic">Results</h2>
-                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="renderResultsView()">
-                </div>
-                <div id="result-sum-grid" class="grid grid-cols-2 gap-3 mb-6"></div>
-                <div class="glass-card p-4">
-                    <h3 class="text-xs font-bold text-gray-400 mb-2 uppercase italic">Achievement List</h3>
-                    <div id="result-todo-list" class="space-y-2"></div>
-                </div>
-            </section>
-
-            <!-- Rankings (グローバル:基本カテゴリーのみ / グループ:カスタム込み) -->
-            <section id="ranking" class="view-section">
-                <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-xl font-black italic">Rankings</h2>
-                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
-                </div>
-                
-                <div id="rank-scope-tabs" class="flex gap-2 mb-3"></div>
-                <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
-                <div id="ranking-display" class="glass-card overflow-hidden"></div>
-            </section>
-
-            <!-- Profile ＆ グループ -->
-            <section id="profile" class="view-section">
-                <div id="profile-header-area"></div>
-
-                <div class="glass-card p-5 mb-6 space-y-4 border-2 border-blue-500/20">
-                    <h3 class="text-xs font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                        <i class="bi bi-people-fill text-lg"></i>
-                        <span>グループ機能 (6桁招待コード)</span>
-                    </h3>
-                    <div id="my-group-info" class="text-xs"></div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
-                        <button onclick="handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
-                    </div>
-                </div>
-
-                <div class="glass-card p-6 mb-6 text-center">
-                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Time Allocation (24h)</h3>
-                    <canvas id="profilePieChart"></canvas>
-                </div>
+                <button onclick="showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active
