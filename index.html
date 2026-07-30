@@ -3,9 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary v16.3 Fully Integrated Bugfix</title>
+    <title>Satoz Diary v15.0 Complete Photo & Group Sync</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
+
+    <!-- Firebase SDK (Auth & Firestore) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC3nZEh7H-3HdUSJ3KfUu1e2HNgYTa6yRs",
+            authDomain: "satoz-diary.firebaseapp.com",
+            projectId: "satoz-diary",
+            storageBucket: "satoz-diary.firebasestorage.app",
+            messagingSenderId: "596323639753",
+            appId: "1:596323639753:web:f4c4a93d1573eb8ab28818"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        window.cloud = {
+            login: () => signInWithPopup(auth, provider),
+            logout: () => signOut(auth),
+            saveAllUserData: async (uid, data) => {
+                try { 
+                    await setDoc(doc(db, "users", uid), data, { merge: true });
+                    console.log("Cloud save success");
+                } catch(e) { 
+                    console.error("Cloud save error:", e); 
+                    alert("クラウド保存エラー: " + e.message);
+                }
+            },
+            getUserData: async (uid) => {
+                try {
+                    const snap = await getDoc(doc(db, "users", uid));
+                    return snap.exists() ? snap.data() : null;
+                } catch(e) { console.error(e); return null; }
+            },
+            postTimeline: async (postData) => {
+                try {
+                    await addDoc(collection(db, "timeline"), { ...postData, createdAt: Date.now() });
+                } catch(e) { console.error(e); }
+            },
+            listenTimeline: (callback) => {
+                const q = query(collection(db, "timeline"), orderBy("createdAt", "desc"), limit(50));
+                return onSnapshot(q, (snapshot) => {
+                    const posts = snapshot.docs.map(doc => doc.data());
+                    callback(posts);
+                });
+            },
+            createGroup: async (groupName, user) => {
+                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const groupData = {
+                    code: code,
+                    name: groupName,
+                    hostUid: user.id,
+                    members: [{ uid: user.id, name: user.name, avatar: user.avatar }]
+                };
+                await setDoc(doc(db, "groups", code), groupData);
+                return { code, name: groupName };
+            },
+            joinGroup: async (code, user) => {
+                const ref = doc(db, "groups", code.toUpperCase());
+                const snap = await getDoc(ref);
+                if (!snap.exists()) return { success: false, msg: "グループが見つかりません" };
+                
+                await updateDoc(ref, {
+                    members: arrayUnion({ uid: user.id, name: user.name, avatar: user.avatar })
+                });
+                return { success: true, group: snap.data() };
+            }
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+            const loginScreen = document.getElementById('login-screen');
+            const appShell = document.getElementById('app-shell');
+
+            if (user) {
+                const cloudData = await window.cloud.getUserData(user.uid);
+                if (cloudData) window.dbData = cloudData;
+                
+                window.dbData.user.name = window.dbData.user.name || user.displayName || "User";
+                window.dbData.user.id = user.uid;
+                window.dbData.user.avatar = window.dbData.user.avatar || user.photoURL;
+
+                saveLocal();
+                await window.cloud.saveAllUserData(user.uid, window.dbData);
+
+                loginScreen.style.display = 'none';
+                appShell.style.display = 'block';
+
+                initApp();
+                window.cloud.listenTimeline((posts) => {
+                    window.allPosts = posts;
+                    renderTimeline();
+                });
+            } else {
+                loginScreen.style.display = 'flex';
+                appShell.style.display = 'none';
+            }
+        });
+    </script>
 
     <!-- Tailwind CSS / Chart.js / Bootstrap Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,7 +128,7 @@
         .nav-item { color: #86868b; flex: 1; text-align: center; font-size: 9px; font-weight: bold; background: none; border: none; cursor: pointer; }
         .nav-item.active { color: var(--apple-accent); }
         input, select, textarea { background: rgba(120,120,120,0.1); border: none; border-radius: 12px; padding: 12px; color: inherit; outline: none; }
-        .chip { white-space: nowrap; font-size: 10px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(120,120,120,0.1); cursor: pointer; }
+        .chip { white-space: nowrap; font-size: 10px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(120,120,120,0.1); }
         .chip.active { background: var(--apple-accent); color: white; }
         .todo-title { font-size: 15px; font-weight: 800; }
         .todo-memo { font-size: 11px; font-weight: 500; color: #0071e3; }
@@ -38,7 +141,7 @@
 <body>
 
     <!-- 写真全画面表示モーダル -->
-    <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="window.closeImageModal()">
+    <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="closeImageModal()">
         <img id="image-modal-img" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
         <button class="absolute top-6 right-6 text-white text-3xl font-bold cursor-pointer">×</button>
     </div>
@@ -54,17 +157,17 @@
                 <i class="bi bi-google text-lg"></i>
                 <span>Googleでログイン</span>
             </button>
-            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v16.3</p>
+            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v15.0</p>
         </div>
     </div>
 
     <!-- 2. アプリ本体 -->
     <div id="app-shell" style="display:none;">
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
-            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="window.showSection('home')">Satoz Diary</h1>
+            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="showSection('home')">Satoz Diary</h1>
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
-                <button onclick="window.showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
+                <button onclick="showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
                     <i class="bi bi-gear-fill text-sm"></i>
                 </button>
             </div>
@@ -77,17 +180,18 @@
                 <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="font-bold text-sm">予定管理 (今日・明日連動)</h2>
-                        <button onclick="window.openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
+                        <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
                     </div>
                     <div id="todo-display-list" class="space-y-4"></div>
                 </div>
 
                 <div id="category-grid" class="grid grid-cols-4 gap-3 mb-6"></div>
 
+                <!-- 記録入力エリア -->
                 <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
                     <div class="flex justify-between items-center mb-4">
                         <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
-                        <div onclick="window.closeInput()" class="cursor-pointer text-xl font-bold">×</div>
+                        <div onclick="closeInput()" class="cursor-pointer text-xl font-bold">×</div>
                     </div>
                     <div class="grid grid-cols-2 gap-2 mb-4 text-[10px] font-bold text-gray-400 uppercase">
                         <div>日付<input type="date" id="rec-date" class="w-full mt-1"></div>
@@ -96,15 +200,16 @@
 
                     <div id="dynamic-fields" class="space-y-4"></div>
 
+                    <!-- 写真添付ボタン ＆ プレビュー -->
                     <div class="mt-4">
-                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="window.handleRecPhotoSelect(event)">
+                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="handleRecPhotoSelect(event)">
                         <button type="button" onclick="document.getElementById('rec-photo-input').click()" class="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-xl flex items-center gap-1.5">
                             <i class="bi bi-camera-fill"></i>
                             <span>📷 写真を追加</span>
                         </button>
                         <div id="rec-photo-preview-box" class="hidden relative mt-2 w-24 h-24">
                             <img id="rec-photo-preview-img" class="w-24 h-24 rounded-xl object-cover border-2 border-blue-500/30">
-                            <button type="button" onclick="window.clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
+                            <button type="button" onclick="clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
                         </div>
                     </div>
 
@@ -115,17 +220,17 @@
                         <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
                     </div>
                     
-                    <button onclick="window.saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
+                    <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
                 </div>
                 
-                <button onclick="window.showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2 hover:bg-black/5 transition">＋ カテゴリー追加</button>
+                <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2 hover:bg-black/5 transition">＋ カテゴリー追加</button>
             </section>
 
             <!-- カテゴリー追加画面 -->
             <section id="cat-maker" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">カテゴリー追加</h2>
-                    <button onclick="window.showSection('home')" class="text-xs font-bold text-gray-400">戻る</button>
+                    <button onclick="showSection('home')" class="text-xs font-bold text-gray-400">戻る</button>
                 </div>
                 <div class="glass-card p-6 space-y-4">
                     <div>
@@ -138,7 +243,7 @@
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-400 uppercase">単位の選択</label>
-                        <select id="new-cat-unit-type" class="w-full mt-1" onchange="window.toggleCustomUnit(this.value)">
+                        <select id="new-cat-unit-type" class="w-full mt-1" onchange="toggleCustomUnit(this.value)">
                             <option value="time">時間 (h / m)</option>
                             <option value="kcal">カロリー (kcal)</option>
                             <option value="kg">体重・重量 (kg)</option>
@@ -152,15 +257,18 @@
                         <label class="text-[10px] font-bold text-gray-400 uppercase">単位を入力</label>
                         <input type="text" id="new-cat-custom-unit" placeholder="例: ページ, ml, 錠" class="w-full mt-1">
                     </div>
-                    <button onclick="window.createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">カテゴリーを作成</button>
+                    <button onclick="createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">カテゴリーを作成</button>
                 </div>
             </section>
 
-            <!-- Timeline -->
+            <!-- Timeline (バナー風フィルター) -->
             <section id="timeline" class="view-section">
                 <div class="mb-4">
                     <h2 class="text-xl font-black mb-3 italic text-blue-600">Feed</h2>
-                    <div id="tl-group-banner" class="flex gap-2 overflow-x-auto pb-2"></div>
+                    <!-- バナー風 グローバル/グループ フィルタータブ -->
+                    <div id="tl-group-banner" class="flex gap-2 overflow-x-auto pb-2">
+                        <!-- JS描画 -->
+                    </div>
                 </div>
                 <div id="feed-list" class="space-y-4">読み込み中...</div>
             </section>
@@ -169,7 +277,7 @@
             <section id="results" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">Results</h2>
-                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="window.renderResultsView()">
+                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="renderResultsView()">
                 </div>
                 <div id="result-sum-grid" class="grid grid-cols-2 gap-3 mb-6"></div>
                 <div class="glass-card p-4">
@@ -178,14 +286,18 @@
                 </div>
             </section>
 
-            <!-- Rankings -->
+            <!-- Rankings (グローバル/グループ順位) -->
             <section id="ranking" class="view-section">
                 <div class="flex justify-between items-center mb-3">
                     <h2 class="text-xl font-black italic">Rankings</h2>
-                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="window.updateRankList(window.rankCatId)">
+                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
                 </div>
                 
-                <div id="rank-scope-tabs" class="flex gap-2 mb-3"></div>
+                <!-- グローバル / グループ順位 切替タブ -->
+                <div id="rank-scope-tabs" class="flex gap-2 mb-3">
+                    <!-- JS描画 -->
+                </div>
+
                 <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
                 <div id="ranking-display" class="glass-card overflow-hidden"></div>
             </section>
@@ -201,8 +313,8 @@
                     </h3>
                     <div id="my-group-info" class="text-xs"></div>
                     <div class="grid grid-cols-2 gap-2">
-                        <button onclick="window.handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
-                        <button onclick="window.handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
+                        <button onclick="handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
+                        <button onclick="handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
                     </div>
                 </div>
 
@@ -212,14 +324,14 @@
                 </div>
             </section>
 
-            <!-- Settings -->
+            <!-- Settings (クラウド同期) -->
             <section id="settings" class="view-section">
                 <h2 class="text-xl font-bold mb-6 text-center">Settings</h2>
                 <div class="glass-card p-5 space-y-4">
                     <div class="flex flex-col items-center gap-2">
                         <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
                         <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
-                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="window.handleAvatarFileSelect(event)">
+                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="handleAvatarFileSelect(event)">
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-400 uppercase">名前</label>
@@ -243,7 +355,7 @@
                             <input type="number" id="set-age" class="w-full mt-1">
                         </div>
                     </div>
-                    <button onclick="window.saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">設定をクラウドへ保存</button>
+                    <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">設定をクラウドへ保存</button>
                     <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2">ログアウト</button>
                 </div>
             </section>
@@ -251,35 +363,16 @@
 
         <!-- タブバー -->
         <nav class="tab-bar">
-            <button onclick="window.showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
-            <button onclick="window.showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
-            <button onclick="window.showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
-            <button onclick="window.showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
-            <button onclick="window.showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
+            <button onclick="showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
+            <button onclick="showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
+            <button onclick="showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
+            <button onclick="showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
+            <button onclick="showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
         </nav>
     </div>
 
-    <!-- 統合済みの唯一のJavaScriptモジュール -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyC3nZEh7H-3HdUSJ3KfUu1e2HNgYTa6yRs",
-            authDomain: "satoz-diary.firebaseapp.com",
-            projectId: "satoz-diary",
-            storageBucket: "satoz-diary.firebasestorage.app",
-            messagingSenderId: "596323639753",
-            appId: "1:596323639753:web:f4c4a93d1573eb8ab28818"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
-
-        // 状態定義
+    <!-- JavaScript ロジック -->
+    <script>
         window.dbData = JSON.parse(localStorage.getItem('sz_v11_db') || JSON.stringify({
             user: { name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null, groupCode: null, groupName: null },
             records: [],
@@ -288,157 +381,85 @@
         }));
 
         window.allPosts = [];
-        window.currentTLFilter = 'global';
-        window.currentRankScope = 'global';
-        window.currentRecPhotoData = null;
-        window.currentCatId = '';
-        window.rankCatId = 'study';
+        let currentTLFilter = 'global'; // 'global' or groupCode
+        let currentRankScope = 'global'; // 'global' or 'group'
+        let currentRecPhotoData = null; // 添付写真データ
 
         const baseCats = [
-            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg', isCustom: false },
-            { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal', isCustom: false },
+            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
+            { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
             { 
-                id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0, isCustom: false,
+                id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0,
                 subOptions: ['国語', '数学', '物理', '化学', '英語', '情報', 'その他'] 
             },
             { 
-                id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0, isCustom: false,
+                id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0,
                 subOptions: ['腹筋', '背筋', '腕立て伏せ', 'プランク', '機械', 'その他'] 
             },
-            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3, isCustom: false },
-            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字', isCustom: false },
-            { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9, isCustom: false }
+            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
+            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
+            { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
         ];
 
         const presetIcons = ['bi-book', 'bi-fire', 'bi-person-walking', 'bi-speedometer2', 'bi-chat-quote', 'bi-moon-stars', 'bi-cup-hot', 'bi-heart-pulse', 'bi-controller', 'bi-music-note', 'bi-droplet', 'bi-capsule'];
         let selectedIcon = presetIcons[0];
+        let currentCatId = '', rankCatId = 'study';
 
-        // Firebase Cloud Methods
-        window.cloud = {
-            login: async () => {
-                if (window.location.protocol === 'file:') {
-                    alert("【動作エラー】file:// プロトコルではGoogleログインが動かないため、http://localhost 等のWebサーバー経由で開いてください。");
-                    return;
-                }
-                try {
-                    await signInWithPopup(auth, provider);
-                } catch (error) {
-                    console.error("Firebase Login Error:", error);
-                    if (error.code === 'auth/unauthorized-domain') {
-                        alert("【設定エラー】Firebase Consoleの承認済みドメインに " + window.location.hostname + " を追加してください。");
-                    } else if (error.code !== 'auth/popup-closed-by-user') {
-                        alert("【ログインエラー】" + error.message);
-                    }
-                }
-            },
-            logout: () => signOut(auth),
-            saveAllUserData: async (uid, data) => {
-                try { await setDoc(doc(db, "users", uid), data, { merge: true }); } catch(e) { console.error(e); }
-            },
-            getUserData: async (uid) => {
-                try {
-                    const snap = await getDoc(doc(db, "users", uid));
-                    return snap.exists() ? snap.data() : null;
-                } catch(e) { return null; }
-            },
-            postTimeline: async (postData) => {
-                try { await addDoc(collection(db, "timeline"), { ...postData, createdAt: Date.now() }); } catch(e) { console.error(e); }
-            },
-            listenTimeline: (callback) => {
-                const q = query(collection(db, "timeline"), orderBy("createdAt", "desc"), limit(50));
-                return onSnapshot(q, (snapshot) => {
-                    const posts = snapshot.docs.map(doc => doc.data());
-                    callback(posts);
-                });
-            },
-            createGroup: async (groupName, user) => {
-                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-                const groupData = { code, name: groupName, hostUid: user.id, members: [{ uid: user.id, name: user.name, avatar: user.avatar }] };
-                await setDoc(doc(db, "groups", code), groupData);
-                return { code, name: groupName };
-            },
-            joinGroup: async (code, user) => {
-                const ref = doc(db, "groups", code.toUpperCase());
-                const snap = await getDoc(ref);
-                if (!snap.exists()) return { success: false, msg: "グループが見つかりません" };
-                await updateDoc(ref, { members: arrayUnion({ uid: user.id, name: user.name, avatar: user.avatar }) });
-                return { success: true, group: snap.data() };
-            }
-        };
-
-        // UI Functions
-        window.initApp = function() {
+        function initApp() {
             const u = window.dbData.user;
-            if (document.getElementById('set-name')) document.getElementById('set-name').value = u.name || '';
-            if (document.getElementById('set-id')) document.getElementById('set-id').value = u.id || '';
-            if (document.getElementById('set-weight')) document.getElementById('set-weight').value = u.weight || 65;
-            if (document.getElementById('set-height')) document.getElementById('set-height').value = u.height || 170;
-            if (document.getElementById('set-age')) document.getElementById('set-age').value = u.age || 20;
-            if (document.getElementById('set-avatar-preview')) document.getElementById('set-avatar-preview').src = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`;
+            document.getElementById('set-name').value = u.name || '';
+            document.getElementById('set-id').value = u.id || '';
+            document.getElementById('set-weight').value = u.weight || 65;
+            document.getElementById('set-height').value = u.height || 170;
+            document.getElementById('set-age').value = u.age || 20;
+            document.getElementById('set-avatar-preview').src = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`;
             
-            if (document.getElementById('results-date')) document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
-            if (document.getElementById('rank-date')) document.getElementById('rank-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('rank-date').value = new Date().toISOString().split('T')[0];
 
-            window.renderIconPicker();
-            window.renderCategories();
-            window.renderAll();
-            window.renderResultsView();
-            window.showSection('home');
+            renderIconPicker();
+            renderCategories();
+            renderAll();
+            renderResultsView();
 
-            if (!window.clockTimer) {
-                window.clockTimer = setInterval(() => {
-                    const clock = document.getElementById('realtime-clock');
-                    if (clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
-                }, 1000);
-            }
-        };
+            setInterval(() => {
+                const clock = document.getElementById('realtime-clock');
+                if (clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
+            }, 1000);
+        }
 
-        window.showSection = function(id) {
-            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-            const target = document.getElementById(id);
-            if (target) target.classList.add('active');
-            
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            const navBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.getAttribute('onclick')?.includes(`'${id}'`));
-            if (navBtn) navBtn.classList.add('active');
-
-            if (id === 'ranking') window.updateRankList(window.rankCatId);
-            if (id === 'results') window.renderResultsView();
-            if (id === 'profile') window.renderProfilePage();
-            
-            window.renderAll();
-        };
-
-        window.handleRecPhotoSelect = function(e) {
+        // 入力写真の選択処理
+        function handleRecPhotoSelect(e) {
             const file = e.target.files[0];
             if (!file) return;
             const r = new FileReader();
             r.onload = (ev) => {
-                window.currentRecPhotoData = ev.target.result;
-                document.getElementById('rec-photo-preview-img').src = window.currentRecPhotoData;
+                currentRecPhotoData = ev.target.result;
+                document.getElementById('rec-photo-preview-img').src = currentRecPhotoData;
                 document.getElementById('rec-photo-preview-box').classList.remove('hidden');
             };
             r.readAsDataURL(file);
-        };
+        }
 
-        window.clearRecPhoto = function() {
-            window.currentRecPhotoData = null;
+        function clearRecPhoto() {
+            currentRecPhotoData = null;
             document.getElementById('rec-photo-preview-box').classList.add('hidden');
             document.getElementById('rec-photo-input').value = '';
-        };
+        }
 
-        window.openImageModal = function(src) {
+        // モーダル画像開閉
+        function openImageModal(src) {
             document.getElementById('image-modal-img').src = src;
             document.getElementById('image-modal').classList.remove('hidden');
-        };
+        }
 
-        window.closeImageModal = function() {
+        function closeImageModal() {
             document.getElementById('image-modal').classList.add('hidden');
-        };
+        }
 
-        window.openInput = function(id) {
-            window.currentCatId = id;
-            window.clearRecPhoto();
+        function openInput(id) {
+            currentCatId = id;
+            clearRecPhoto();
             const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === id);
             document.getElementById('input-area').classList.remove('hidden');
             document.getElementById('input-title').innerText = cat ? cat.name : "予定";
@@ -450,7 +471,7 @@
             document.getElementById('calorie-preview').classList.add('hidden');
 
             if (cat && cat.subOptions && cat.subOptions.length > 0) {
-                let subHtml = `<div><label class="text-[10px] font-bold text-gray-400 uppercase">項目・種目</label><select id="v_sub_cat" class="w-full mt-1" onchange="window.toggleSubOther(this.value)">`;
+                let subHtml = `<div><label class="text-[10px] font-bold text-gray-400 uppercase">項目・種目</label><select id="v_sub_cat" class="w-full mt-1" onchange="toggleSubOther(this.value)">`;
                 cat.subOptions.forEach(opt => subHtml += `<option value="${opt}">${opt}</option>`);
                 subHtml += `</select></div><div id="v_sub_other_box" class="hidden"><input type="text" id="v_sub_other" placeholder="詳細を入力 (例: 漢文)" class="w-full mt-1"></div>`;
                 fields.innerHTML += subHtml;
@@ -472,17 +493,17 @@
                     </div>
                 `;
             } else if (id === 'run') {
-                fields.innerHTML += `<input type="number" id="v_dist" placeholder="走った距離(km)" class="w-full mb-2" oninput="window.updatePreCal()">
+                fields.innerHTML += `<input type="number" id="v_dist" placeholder="走った距離(km)" class="w-full mb-2" oninput="updatePreCal()">
                     <div class="flex gap-2 justify-center items-center">
                         <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
-                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="window.updatePreCal()"><span>m</span>
+                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
                     </div>`;
                 document.getElementById('calorie-preview').classList.remove('hidden');
             } else if (cat && cat.type === 'time') {
                 fields.innerHTML += `
                     <div class="flex gap-2 justify-center items-center">
                         <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
-                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="window.updatePreCal()"><span>m</span>
+                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
                     </div>`;
                 if (cat.mets) document.getElementById('calorie-preview').classList.remove('hidden');
             } else if (id === 'sleep') {
@@ -496,24 +517,20 @@
             } else {
                 fields.innerHTML += `<input type="number" id="v1" placeholder="${cat ? cat.unit : ''}を入力" class="w-full">`;
             }
-        };
+        }
 
-        window.toggleSubOther = function(val) {
+        function toggleSubOther(val) {
             const box = document.getElementById('v_sub_other_box');
             if (box) box.classList.toggle('hidden', val !== 'その他');
-        };
+        }
 
-        window.closeInput = function() {
-            document.getElementById('input-area').classList.add('hidden');
-        };
-
-        window.saveRecord = async function() {
+        async function saveRecord() {
             const memo = document.getElementById('rec-comment').value.trim();
             const date = document.getElementById('rec-date').value;
             const time = document.getElementById('rec-time').value;
             let val = 0;
             let durationMin = 0;
-            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === window.currentCatId);
+            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === currentCatId);
 
             let subCatVal = '';
             const subSelect = document.getElementById('v_sub_cat');
@@ -521,7 +538,7 @@
                 subCatVal = (subSelect.value === 'その他') ? (document.getElementById('v_sub_other')?.value.trim() || 'その他') : subSelect.value;
             }
 
-            if (window.currentCatId === 'schedule') {
+            if (currentCatId === 'schedule') {
                 const task = document.getElementById('v_task_todo').value;
                 if (!task) return alert("予定内容を入力してください");
                 const sel = document.getElementById('todo-date-sel').value;
@@ -529,9 +546,9 @@
                 const exactTime = hasTime ? document.getElementById('todo-exact-time').value : null;
 
                 const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate() + 1)).toISOString().split('T')[0];
-                window.dbData.todos.push({ id: Date.now(), time: exactTime, task, memo, done: false, date: targetDate, photo: window.currentRecPhotoData });
+                window.dbData.todos.push({ id: Date.now(), time: exactTime, task, memo, done: false, date: targetDate, photo: currentRecPhotoData });
             } else {
-                if (window.currentCatId === 'run') {
+                if (currentCatId === 'run') {
                     val = parseFloat(document.getElementById('v_dist')?.value || 0);
                     const hrs = parseFloat(document.getElementById('v_hrs')?.value || 0);
                     const mins = parseFloat(document.getElementById('v_mins')?.value || 0);
@@ -539,29 +556,29 @@
                 } else if (cat && cat.type === 'time') {
                     val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
                     durationMin = Math.round(val * 60);
-                } else if (window.currentCatId === 'sleep') {
+                } else if (currentCatId === 'sleep') {
                     const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
                     const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
                     val = (e - s) / 3600000; if (val < 0) val += 24;
                     durationMin = Math.round(val * 60);
-                } else if (window.currentCatId === 'diary') {
+                } else if (currentCatId === 'diary') {
                     val = memo.length;
                 } else {
                     val = parseFloat(document.getElementById('v1')?.value || 0);
                 }
                 
-                if (window.currentCatId === 'weight') window.dbData.user.weight = val;
+                if (currentCatId === 'weight') window.dbData.user.weight = val;
 
                 let mainValStr = `${val.toFixed(1)} ${cat ? cat.unit : ''}`;
-                if (window.currentCatId === 'run') {
+                if (currentCatId === 'run') {
                     mainValStr = `${val.toFixed(1)} km (${durationMin}分)`;
                 } else if (cat && cat.type === 'time') {
-                    mainValStr = window.formatTime(val);
+                    mainValStr = formatTime(val);
                 }
 
                 const post = {
                     id: Date.now(),
-                    catId: window.currentCatId,
+                    catId: currentCatId,
                     catName: cat ? cat.name : "記録",
                     subCategory: subCatVal,
                     val: val,
@@ -570,12 +587,11 @@
                     date: date,
                     time: time,
                     comment: memo,
-                    photo: window.currentRecPhotoData,
+                    photo: currentRecPhotoData,
                     userId: window.dbData.user.id,
                     userName: window.dbData.user.name,
                     userAvatar: window.dbData.user.avatar,
-                    groupCode: window.dbData.user.groupCode || null,
-                    isCustom: cat ? cat.isCustom : false
+                    groupCode: window.dbData.user.groupCode || null
                 };
 
                 window.dbData.records.unshift(post);
@@ -585,21 +601,124 @@
                 }
             }
 
-            window.saveLocal();
+            saveLocal();
             if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
                 await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
             }
 
-            window.closeInput();
+            closeInput();
             alert("保存・同期完了！");
-        };
+        }
 
-        window.saveLocal = function() {
-            localStorage.setItem('sz_v11_db', JSON.stringify(window.dbData));
-            window.renderAll();
-        };
+        // タイムライン描画 (グループ別フィルター対応)
+        function renderTimeline() {
+            const list = document.getElementById('feed-list');
+            const banner = document.getElementById('tl-group-banner');
+            const u = window.dbData.user;
 
-        window.renderAll = function() {
+            if (banner) {
+                banner.innerHTML = `
+                    <button onclick="setTLFilter('global')" class="chip ${currentTLFilter === 'global' ? 'active' : ''}">🌐 Global</button>
+                    ${u.groupCode ? `<button onclick="setTLFilter('${u.groupCode}')" class="chip ${currentTLFilter === u.groupCode ? 'active' : ''}">👥 ${u.groupName || 'グループ'} (${u.groupCode})</button>` : ''}
+                `;
+            }
+
+            if (!list) return;
+
+            let filteredPosts = window.allPosts || [];
+            if (currentTLFilter !== 'global') {
+                filteredPosts = filteredPosts.filter(p => p.groupCode === currentTLFilter);
+            }
+
+            if (filteredPosts.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400 text-xs py-8">投稿がありません</p>`;
+                return;
+            }
+
+            list.innerHTML = filteredPosts.map(p => `
+                <div class="glass-card p-4 text-left shadow-sm">
+                    <div class="flex items-center gap-2 mb-2">
+                        <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-6 h-6 rounded-full object-cover">
+                        <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName || '記録'}・${p.userName || '匿名'}</p>
+                    </div>
+                    <p class="todo-title">${p.valDisp}</p>
+                    ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
+                    ${p.photo ? `<img src="${p.photo}" onclick="openImageModal('${p.photo}')" class="w-24 h-24 rounded-xl object-cover mt-2 cursor-pointer border border-black/10 hover:opacity-90 transition">` : ''}
+                    <p class="text-[8px] text-gray-400 mt-2">${p.date || ''} ${p.time || ''}</p>
+                </div>
+            `).join('');
+        }
+
+        function setTLFilter(scope) {
+            currentTLFilter = scope;
+            renderTimeline();
+        }
+
+        // --- カテゴリー追加 ---
+        function renderIconPicker() {
+            const picker = document.getElementById('icon-picker');
+            if (picker) {
+                picker.innerHTML = presetIcons.map(icon => `
+                    <button type="button" onclick="selectIcon('${icon}')" class="p-3 rounded-xl flex items-center justify-center border ${selectedIcon === icon ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200'}">
+                        <i class="${icon} text-lg"></i>
+                    </button>
+                `).join('');
+            }
+        }
+
+        function selectIcon(icon) { selectedIcon = icon; renderIconPicker(); }
+        function toggleCustomUnit(val) { document.getElementById('custom-unit-box').classList.toggle('hidden', val !== 'custom'); }
+
+        function createCustomCategory() {
+            const name = document.getElementById('new-cat-name').value.trim();
+            if (!name) return alert("カテゴリー名を入力してください");
+
+            const unitType = document.getElementById('new-cat-unit-type').value;
+            let unit = unitType, type = 'val';
+
+            if (unitType === 'time') { unit = '時間'; type = 'time'; }
+            else if (unitType === 'custom') { unit = document.getElementById('new-cat-custom-unit').value.trim() || '回'; }
+
+            const newCat = { id: 'custom_' + Date.now(), name, icon: selectedIcon, color: '#0071e3', type, unit };
+            window.dbData.cats = window.dbData.cats || [];
+            window.dbData.cats.push(newCat);
+
+            saveLocal();
+            renderCategories();
+            showSection('home');
+            alert(`カテゴリー「${name}」を追加しました！`);
+        }
+
+        // --- グループ作成 ＆ 参加 ---
+        async function handleCreateGroup() {
+            const name = prompt("グループ名を入力してください", "勉強グループ");
+            if (!name) return;
+            const res = await window.cloud.createGroup(name, window.dbData.user);
+            window.dbData.user.groupCode = res.code;
+            window.dbData.user.groupName = res.name;
+            saveLocal();
+            if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            renderProfilePage();
+            alert(`グループを作成しました！\n招待コード: ${res.code}`);
+        }
+
+        async function handleJoinGroup() {
+            const code = prompt("6桁の招待コードを入力してください");
+            if (!code) return;
+            const res = await window.cloud.joinGroup(code, window.dbData.user);
+            if (res.success) {
+                window.dbData.user.groupCode = code.toUpperCase();
+                window.dbData.user.groupName = res.group.name;
+                saveLocal();
+                if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                renderProfilePage();
+                alert(`グループ「${res.group.name}」に参加しました！`);
+            } else {
+                alert(res.msg);
+            }
+        }
+
+        function renderAll() {
             const today = new Date().toISOString().split('T')[0];
             const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
             
@@ -609,14 +728,14 @@
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">TODAY (${today})</p>
                     ${window.dbData.todos.filter(t => t.date === today).map(t => `
                         <div class="flex items-start gap-3 p-3 bg-white/40 dark:bg-white/5 rounded-xl shadow-sm">
-                            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="window.toggleTodo(${t.id})" class="mt-1">
+                            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})" class="mt-1">
                             <div>
                                 <p class="todo-title ${t.done ? 'todo-checked' : ''}">
                                     ${t.time ? `<span class="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full mr-1.5">${t.time}</span>` : ''}
                                     ${t.task}
                                 </p>
                                 ${t.memo ? `<p class="todo-memo">${t.memo}</p>` : ''}
-                                ${t.photo ? `<img src="${t.photo}" onclick="window.openImageModal('${t.photo}')" class="w-16 h-16 rounded-lg object-cover mt-1 cursor-pointer">` : ''}
+                                ${t.photo ? `<img src="${t.photo}" onclick="openImageModal('${t.photo}')" class="w-16 h-16 rounded-lg object-cover mt-1 cursor-pointer">` : ''}
                             </div>
                         </div>
                     `).join('') || '<p class="text-center text-xs opacity-30 py-2">今日の予定はありません</p>'}
@@ -629,4 +748,213 @@
                                 ${t.task}
                             </p>
                         </div>
-                    `).join('') || '<p class="text
+                    `).join('') || '<p class="text-center text-xs opacity-30 py-2">明日の予定はありません</p>'}
+                `;
+            }
+        }
+
+        function renderCategories() {
+            const grid = document.getElementById('category-grid');
+            const allCats = [...baseCats, ...(window.dbData.cats || [])];
+            if (grid) {
+                grid.innerHTML = allCats.map(c => `
+                    <button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center hover:scale-105 transition">
+                        <i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i>
+                        <span class="text-[9px] font-bold">${c.name}</span>
+                    </button>
+                `).join('');
+            }
+        }
+
+        function renderResultsView() {
+            const date = document.getElementById('results-date').value;
+            const prev = new Date(new Date(date).setDate(new Date(date).getDate() - 1)).toISOString().split('T')[0];
+            const all = [...baseCats, ...(window.dbData.cats || [])];
+            
+            const grid = document.getElementById('result-sum-grid');
+            if (grid) {
+                grid.innerHTML = all.filter(c => c.type !== 'todo').map(c => {
+                    const curRecs = window.dbData.records.filter(r => r.date === date && r.catId === c.id);
+                    const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s, a) => s + a.val, 0);
+                    const curMins = curRecs.reduce((s, a) => s + (a.durationMin || 0), 0);
+                    
+                    const oldRecs = window.dbData.records.filter(r => r.date === prev && r.catId === c.id);
+                    const old = (c.id === 'weight') ? (oldRecs[0]?.val || 0) : oldRecs.reduce((s, a) => s + a.val, 0);
+                    const diff = cur - old;
+                    
+                    let valDisp = '';
+                    if (c.id === 'run') {
+                        valDisp = `${cur.toFixed(1)} km <span class="text-[10px] text-gray-500 font-normal ml-0.5">(${curMins}分)</span>`;
+                    } else if (c.type === 'time' || c.type === 'sleep') {
+                        valDisp = formatTime(cur);
+                    } else if (c.type === 'diary') {
+                        valDisp = `${cur}文字`;
+                    } else {
+                        valDisp = `${cur.toFixed(1)} ${c.unit}`;
+                    }
+
+                    const diffH = cur === 0 ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
+                    
+                    return cur > 0 ? `
+                        <div class="glass-card p-3 text-center">
+                            <p class="text-[8px] font-bold text-gray-400 uppercase">${c.name}</p>
+                            <p class="text-sm font-black text-blue-600">${valDisp}</p>
+                            ${diffH}
+                        </div>
+                    ` : '';
+                }).join('') || `<p class="col-span-2 text-center text-xs text-gray-400 py-4">この日の記録はありません</p>`;
+            }
+
+            const todoList = document.getElementById('result-todo-list');
+            if (todoList) {
+                todoList.innerHTML = window.dbData.todos.filter(t => t.date === date && t.done).map(t => `
+                    <div class="p-2 bg-green-50 dark:bg-green-900/20 text-[10px] rounded-lg text-green-700 dark:text-green-300 font-bold">✓ ${t.task}</div>
+                `).join('') || `<p class="text-center text-xs text-gray-400">達成した予定はありません</p>`;
+            }
+        }
+
+        function closeInput() { document.getElementById('input-area').classList.add('hidden'); }
+        function saveLocal() { localStorage.setItem('sz_v11_db', JSON.stringify(window.dbData)); renderAll(); }
+        
+        function toggleTodo(id) {
+            const t = window.dbData.todos.find(x => x.id === id);
+            if (t) {
+                t.done = !t.done;
+                saveLocal();
+                if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                    window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                }
+            }
+        }
+
+        function updatePreCal() {
+            const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
+            const m = parseFloat(document.getElementById('v_mins')?.value || 0);
+            const cat = baseCats.find(c => c.id === currentCatId);
+            if (cat && cat.mets) {
+                const cal = Math.round(cat.mets * (window.dbData.user.weight || 65) * (h + m / 60) * 1.05);
+                document.getElementById('cal-val').innerText = `${cal} kcal`;
+            }
+        }
+
+        function formatTime(h) {
+            const hr = Math.floor(h);
+            const mn = Math.round((h - hr) * 60);
+            return hr > 0 ? `${hr}h ${mn}m` : `${mn}m`;
+        }
+
+        function showSection(id) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const navBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.getAttribute('onclick')?.includes(`'${id}'`));
+            if (navBtn) navBtn.classList.add('active');
+
+            if (id === 'ranking') updateRankList(rankCatId);
+            if (id === 'results') renderResultsView();
+            if (id === 'profile') renderProfilePage();
+            
+            renderAll();
+        }
+
+        // 設定のクラウド完全保存
+        async function saveSettings() {
+            window.dbData.user.name = document.getElementById('set-name').value;
+            window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
+            window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
+            window.dbData.user.age = parseInt(document.getElementById('set-age').value || 20);
+            
+            saveLocal();
+            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                alert("設定をクラウドへ保存しました！");
+            }
+        }
+
+        function handleAvatarFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => {
+                window.dbData.user.avatar = ev.target.result;
+                document.getElementById('set-avatar-preview').src = ev.target.result;
+                saveLocal();
+            };
+            r.readAsDataURL(file);
+        }
+
+        function renderProfilePage() {
+            const u = window.dbData.user;
+            const area = document.getElementById('profile-header-area');
+            if (area) {
+                area.innerHTML = `
+                    <div class="glass-card p-6 mb-6 flex flex-col items-center text-center">
+                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.name)}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover">
+                        <h2 class="text-xl font-black mt-4">${u.name}</h2>
+                        <p class="text-[10px] text-gray-400">UID: ${u.id}</p>
+                    </div>`;
+            }
+
+            const gInfo = document.getElementById('my-group-info');
+            if (gInfo) {
+                if (u.groupCode) {
+                    gInfo.innerHTML = `<p class="font-bold text-green-600">所属: ${u.groupName || 'グループ'} <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded font-mono text-sm ml-1">${u.groupCode}</span></p>`;
+                } else {
+                    gInfo.innerHTML = `<p class="text-gray-400">グループに未所属です</p>`;
+                }
+            }
+        }
+
+        // Rankings (グローバル ＆ グループランキング切替)
+        function updateRankList(id) {
+            rankCatId = id;
+            const u = window.dbData.user;
+            const allCats = [...baseCats, ...(window.dbData.cats || [])];
+            const cat = allCats.find(c => c.id === id);
+            const unitStr = cat ? cat.unit : '';
+
+            // スコープ切り替えタブ
+            const scopeTabs = document.getElementById('rank-scope-tabs');
+            if (scopeTabs) {
+                scopeTabs.innerHTML = `
+                    <button onclick="setRankScope('global')" class="chip ${currentRankScope === 'global' ? 'active' : ''}">🌐 グローバル</button>
+                    ${u.groupCode ? `<button onclick="setRankScope('group')" class="chip ${currentRankScope === 'group' ? 'active' : ''}">👥 グループ内 (${u.groupName || u.groupCode})</button>` : ''}
+                `;
+            }
+
+            const filters = document.getElementById('rank-filters');
+            if (filters) {
+                filters.innerHTML = allCats.filter(c => c.type !== 'todo').map(c => `
+                    <button onclick="updateRankList('${c.id}')" class="chip ${rankCatId === c.id ? 'active' : ''}">${c.name}</button>
+                `).join('');
+            }
+            
+            const myV = window.dbData.records.filter(r => r.catId === id).reduce((s, a) => s + a.val, 0);
+            
+            let valFormatted = `${myV.toFixed(1)} ${unitStr}`;
+            if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
+                valFormatted = `${formatTime(myV)}`;
+            } else if (cat && cat.type === 'diary') {
+                valFormatted = `${myV} 文字`;
+            }
+
+            const display = document.getElementById('ranking-display');
+            if (display) {
+                display.innerHTML = `
+                    <div class="flex items-center p-4 bg-white/50 dark:bg-white/5">
+                        <span class="w-8 font-black text-yellow-500">1</span>
+                        <span class="flex-1 font-bold text-sm">${window.dbData.user.name} (あなた)</span>
+                        <span class="font-black text-blue-600 text-xs">${valFormatted}</span>
+                    </div>`;
+            }
+        }
+
+        function setRankScope(scope) {
+            currentRankScope = scope;
+            updateRankList(rankCatId);
+        }
+    </script>
+</body>
+</html>
