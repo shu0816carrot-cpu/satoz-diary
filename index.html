@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.7</title>
+    <title>Satoz Diary Ver. α.8</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -126,7 +126,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.7</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.8</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -296,22 +296,40 @@
                 </div>
             </section>
 
-            <!-- Settings -->
+            <!-- Settings (Satoz Diary アカウント設定) -->
             <section id="settings" class="view-section">
-                <h2 class="text-xl font-bold mb-6 text-center">Settings</h2>
+                <h2 class="text-xl font-bold mb-4 text-center">Settings</h2>
+                
+                <!-- Google連携インジケーター -->
+                <div id="google-auth-badge" class="glass-card p-3 mb-4 flex items-center justify-between border border-blue-500/30 bg-blue-50/40 dark:bg-blue-900/20">
+                    <div class="flex items-center gap-2">
+                        <i class="bi bi-google text-blue-600 text-base"></i>
+                        <div>
+                            <p class="text-[9px] font-bold text-gray-400 uppercase">認証アカウント</p>
+                            <p id="google-email-disp" class="text-xs font-bold text-blue-600 dark:text-blue-300">Googleアカウント連携中</p>
+                        </div>
+                    </div>
+                    <span class="text-[9px] font-black bg-green-500 text-white px-2 py-0.5 rounded-full">🔗 紐付け済</span>
+                </div>
+
                 <div class="glass-card p-5 space-y-4">
-                    <div class="flex flex-col items-center gap-2">
+                    <h3 class="text-xs font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+                        <i class="bi bi-person-badge-fill text-base"></i>
+                        <span>Satoz Diary アカウント設定</span>
+                    </h3>
+
+                    <div class="flex flex-col items-center gap-2 pt-2">
                         <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
-                        <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
+                        <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">Satoz Diary アイコン変更</button>
                         <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="window.handleAvatarFileSelect(event)">
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">名前</label>
-                        <input type="text" id="set-name" class="w-full mt-1">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Satoz Diary 表示名</label>
+                        <input type="text" id="set-name" class="w-full mt-1 text-xs font-bold" placeholder="表示名を入力">
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">ユーザーID (UID)</label>
-                        <input type="text" id="set-id" class="w-full mt-1 opacity-70" readonly>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Satoz Diary ユーザーID (UID / 自由変更)</label>
+                        <input type="text" id="set-id" class="w-full mt-1 text-xs font-mono font-bold" placeholder="例: satoz_user123">
                     </div>
                     <div class="grid grid-cols-3 gap-2">
                         <div>
@@ -327,8 +345,8 @@
                             <input type="number" id="set-age" class="w-full mt-1">
                         </div>
                     </div>
-                    <button onclick="window.saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">設定を保存</button>
-                    <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2">ログアウト</button>
+                    <button onclick="window.saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">Satoz Diary 設定を更新保存</button>
+                    <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2 text-xs">ログアウト</button>
                 </div>
             </section>
         </main>
@@ -866,7 +884,6 @@
             alert(`カテゴリー「${cat.name}」を削除しました。`);
         };
 
-        // 🌟 タイムライン描画（新UI＆グループ判定修正）
         window.renderTimeline = function() {
             const list = document.getElementById('feed-list');
             const banner = document.getElementById('tl-group-banner');
@@ -887,7 +904,6 @@
             const allCats = [...baseCats, ...(window.dbData.cats || [])];
             let filteredPosts = window.allPosts || [];
 
-            // グループ絞り込み判定
             if (window.currentTLFilter !== 'global') {
                 filteredPosts = filteredPosts.filter(p => {
                     if (p.userGroups && Array.isArray(p.userGroups)) {
@@ -914,7 +930,6 @@
 
                 return `
                 <div class="glass-card p-4 text-left shadow-sm relative">
-                    <!-- 新ヘッダーUI: [左: アイコン+名前] --- [中央: カテゴリーアイコン+名前] --- [右: 削除ボタン] -->
                     <div class="flex items-center justify-between mb-3 pb-2 border-b border-black/5 dark:border-white/5">
                         <div class="flex items-center gap-2">
                             <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-7 h-7 rounded-full object-cover border border-gray-200 shadow-sm">
@@ -1279,17 +1294,31 @@
             return h > 0 ? `${h}h ${m}m` : `${m}m`;
         };
 
+        // 🌟 Satoz Diary アカウント設定の個別更新保存
         window.saveSettings = async function() {
-            window.dbData.user.name = document.getElementById('set-name').value;
+            const newName = document.getElementById('set-name').value.trim();
+            const newId = document.getElementById('set-id').value.trim();
+
+            if (!newName) return alert("Satoz Diary 表示名を入力してください");
+            if (!newId) return alert("Satoz Diary ユーザーIDを入力してください");
+
+            window.dbData.user.name = newName;
+            window.dbData.user.id = newId;
             window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
             window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
             window.dbData.user.age = parseInt(document.getElementById('set-age').value || 20);
             
             window.saveLocal();
-            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
-                alert("設定を保存しました！");
+            
+            // クラウド同期 (Google UIDのキーの配下にSatoz Diary設定を書き込む)
+            const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+            if (window.cloud && window.cloud.saveAllUserData) {
+                await window.cloud.saveAllUserData(googleUid, window.dbData);
             }
+
+            window.renderProfilePage();
+            window.renderTimeline();
+            alert("Satoz Diary アカウント設定を更新・保存しました！");
         };
 
         window.handleAvatarFileSelect = function(e) {
@@ -1312,7 +1341,7 @@
                     <div class="glass-card p-6 mb-6 flex flex-col items-center text-center">
                         <img src="${u.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.name)}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover">
                         <h2 class="text-xl font-black mt-4">${u.name}</h2>
-                        <p class="text-[10px] text-gray-400">UID: ${u.id}</p>
+                        <p class="text-[10px] text-gray-400 font-mono">ID: ${u.id}</p>
                     </div>`;
             }
 
@@ -1335,7 +1364,6 @@
             }
         };
 
-        // 🌟 全ユーザー・グループ別ランキング集計＆描画
         window.updateRankList = async function(id) {
             const u = window.dbData.user;
             window.rankCatId = id;
@@ -1367,7 +1395,6 @@
                 usersList = await window.cloud.getAllUsersData();
             }
 
-            // データがない/デモモード時のモックデータ生成
             if (usersList.length === 0) {
                 usersList = [
                     { user: { id: u.id, name: u.name + " (あなた)", avatar: u.avatar, groups: u.groups }, records: window.dbData.records },
@@ -1376,7 +1403,6 @@
                     { user: { id: 'mock_3', name: 'ケンジ', avatar: 'https://ui-avatars.com/api/?name=Kenji', groups: [] }, records: [{ catId: 'study', val: 1.5 }, { catId: 'run', val: 8.0 }, { catId: 'weight', val: 70 }] }
                 ];
             } else {
-                // 自分のローカルデータを最新としてマージ
                 const myIndex = usersList.findIndex(x => x.user?.id === u.id);
                 if (myIndex >= 0) {
                     usersList[myIndex] = { user: u, records: window.dbData.records };
@@ -1385,7 +1411,6 @@
                 }
             }
 
-            // グループ絞り込み
             if (window.currentRankScope !== 'global') {
                 usersList = usersList.filter(uData => {
                     const gList = uData.user?.groups || [];
@@ -1393,7 +1418,6 @@
                 });
             }
 
-            // ランキング集計ソート
             const rankedUsers = usersList.map(uData => {
                 const recs = uData.records || [];
                 let val = 0;
@@ -1451,6 +1475,16 @@
             window.updateRankList(window.rankCatId);
         };
 
+        // 📱 スマホ画面復帰（スリープ解除・アプリ復帰）時の自動同期再開
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                if (window.cloud && window.cloud.listenTimeline) {
+                    window.renderTimeline();
+                    if (window.rankCatId) window.updateRankList(window.rankCatId);
+                }
+            }
+        });
+
         if (auth) {
             onAuthStateChanged(auth, async (user) => {
                 const loginScreen = document.getElementById('login-screen');
@@ -1461,9 +1495,19 @@
                     if (loginScreen) loginScreen.style.display = 'none';
                     if (appShell) appShell.style.display = 'block';
 
-                    window.dbData.user.name = user.displayName || window.dbData.user.name || "User";
-                    window.dbData.user.id = user.uid;
-                    window.dbData.user.avatar = user.photoURL || window.dbData.user.avatar;
+                    const emailDisp = document.getElementById('google-email-disp');
+                    if (emailDisp) emailDisp.innerText = user.email || user.displayName || "Google連携済";
+
+                    // 初回のみGoogleの初期値を入れるが、Satoz Diary設定があればそれを最優先適用！
+                    if (!window.dbData.user.name || window.dbData.user.name === "Guest") {
+                        window.dbData.user.name = user.displayName || "User";
+                    }
+                    if (!window.dbData.user.id || window.dbData.user.id.startsWith("user_")) {
+                        window.dbData.user.id = user.uid;
+                    }
+                    if (!window.dbData.user.avatar) {
+                        window.dbData.user.avatar = user.photoURL;
+                    }
 
                     window.initApp();
 
