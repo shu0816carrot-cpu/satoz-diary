@@ -646,3 +646,442 @@
         };
 
         // 🗑️ 予定の削除
+        window.deleteTodo = function(id) {
+            if (!confirm("この予定を完全に削除しますか？")) return;
+            window.dbData.todos = window.dbData.todos.filter(t => t.id !== id);
+            window.saveLocal();
+            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            }
+        };
+
+        // 📅 予定一覧のスリムレンダー (スケジュール風)
+        window.renderAll = function() {
+            const today = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
+            
+            const todoContainer = document.getElementById('todo-display-list');
+            if (todoContainer) {
+                const renderRow = (t) => `
+                    <div class="flex items-center justify-between p-2 bg-white/50 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5 text-xs">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="window.toggleTodo(${t.id})">
+                            <span class="todo-title font-bold text-xs truncate ${t.done ? 'todo-checked' : ''}">
+                                ${t.time ? `<span class="text-[9px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded-md mr-1">${t.time}</span>` : ''}
+                                ${t.task}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            ${window.isTodoEditMode ? `
+                                <button onclick="window.moveTodo(${t.id}, -1)" class="px-1.5 py-0.5 bg-black/10 rounded text-[10px]">▲</button>
+                                <button onclick="window.moveTodo(${t.id}, 1)" class="px-1.5 py-0.5 bg-black/10 rounded text-[10px]">▼</button>
+                                <button onclick="window.deleteTodo(${t.id})" class="px-1.5 py-0.5 bg-red-500 text-white rounded text-[10px] font-bold">🗑️</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+                todoContainer.innerHTML = `
+                    <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">TODAY (${today})</p>
+                    ${window.dbData.todos.filter(t => t.date === today).map(renderRow).join('') || '<p class="text-center text-[10px] opacity-30 py-1">予定なし</p>'}
+
+                    <p class="text-[9px] font-bold text-gray-400 mt-3 uppercase tracking-wider mb-1">TOMORROW (${tomorrow})</p>
+                    ${window.dbData.todos.filter(t => t.date === tomorrow).map(renderRow).join('') || '<p class="text-center text-[10px] opacity-30 py-1">予定なし</p>'}
+                `;
+            }
+        };
+
+        window.renderCategories = function() {
+            const grid = document.getElementById('category-grid');
+            const allCats = [...baseCats, ...(window.dbData.cats || [])];
+            if (grid) {
+                grid.innerHTML = allCats.map(c => `
+                    <button onclick="window.openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center hover:scale-105 transition shadow-sm">
+                        <i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i>
+                        <span class="text-[9px] font-bold">${c.name}</span>
+                    </button>
+                `).join('');
+            }
+        };
+
+        // 🌟 タイムライン (削除機能付き ➔ Firestore完全抹消)
+        window.renderTimeline = function() {
+            const list = document.getElementById('feed-list');
+            const banner = document.getElementById('tl-group-banner');
+            const u = window.dbData.user;
+
+            if (banner) {
+                banner.innerHTML = `
+                    <button onclick="window.setTLFilter('global')" class="chip ${window.currentTLFilter === 'global' ? 'active' : ''}">🌐 Global</button>
+                    ${u.groupCode ? `<button onclick="window.setTLFilter('${u.groupCode}')" class="chip ${window.currentTLFilter === u.groupCode ? 'active' : ''}">👥 ${u.groupName || 'グループ'} (${u.groupCode})</button>` : ''}
+                `;
+            }
+
+            if (!list) return;
+
+            let filteredPosts = window.allPosts || [];
+            if (window.currentTLFilter !== 'global') {
+                filteredPosts = filteredPosts.filter(p => p.groupCode === window.currentTLFilter);
+            }
+
+            if (filteredPosts.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400 text-xs py-8">投稿がありません</p>`;
+                return;
+            }
+
+            list.innerHTML = filteredPosts.map(p => {
+                const likes = p.likes || [];
+                const comments = p.comments || [];
+                const isLiked = likes.includes(u.id);
+                const isMyPost = p.userId === u.id;
+
+                return `
+                <div class="glass-card p-4 text-left shadow-sm relative">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-6 h-6 rounded-full object-cover">
+                            <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName || '記録'}・${p.userName || '匿名'}</p>
+                        </div>
+                        ${isMyPost && p.docId ? `<button onclick="window.handleDeletePost('${p.docId}')" class="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md hover:bg-red-100">🗑️ 削除</button>` : ''}
+                    </div>
+                    <p class="todo-title">${p.valDisp}</p>
+                    ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
+                    ${p.photo ? `<img src="${p.photo}" onclick="window.openImageModal('${p.photo}')" class="w-24 h-24 rounded-xl object-cover mt-2 cursor-pointer border border-black/10 hover:opacity-90 transition">` : ''}
+                    <p class="text-[8px] text-gray-400 mt-2">${p.date || ''} ${p.time || ''}</p>
+
+                    <div class="flex items-center gap-4 mt-3 pt-3 border-t border-black/5 dark:border-white/5 text-xs font-bold">
+                        <button onclick="window.handleToggleLike('${p.docId}')" class="flex items-center gap-1.5 ${isLiked ? 'text-red-500' : 'text-gray-400'} hover:scale-105 transition">
+                            <i class="bi ${isLiked ? 'bi-heart-fill' : 'bi-heart'}"></i>
+                            <span>${likes.length}</span>
+                        </button>
+                        <button onclick="window.toggleCommentBox('${p.docId}')" class="flex items-center gap-1.5 text-gray-400 hover:text-blue-500 transition">
+                            <i class="bi bi-chat"></i>
+                            <span>${comments.length}</span>
+                        </button>
+                    </div>
+
+                    <div id="comment-box-${p.docId}" class="hidden mt-3 pt-3 border-t border-dashed border-gray-300 dark:border-gray-700 space-y-2">
+                        <div class="space-y-1.5 max-h-32 overflow-y-auto">
+                            ${comments.map(c => `
+                                <div class="text-[10px] bg-black/5 dark:bg-white/5 p-2 rounded-lg">
+                                    <span class="font-bold text-blue-500">${c.userName}:</span>
+                                    <span>${c.text}</span>
+                                </div>
+                            `).join('') || '<p class="text-[9px] text-gray-400 text-center">コメントはまだありません</p>'}
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <input type="text" id="comment-input-${p.docId}" placeholder="コメントを書く..." class="flex-1 text-xs p-2">
+                            <button onclick="window.handleAddComment('${p.docId}')" class="bg-blue-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl">送信</button>
+                        </div>
+                    </div>
+                </div>
+            `;}).join('');
+        };
+
+        // 🗑️ タイムライン削除実行
+        window.handleDeletePost = async function(docId) {
+            if (!confirm("この投稿を削除しますか？\n（データベースから完全に消去されます）")) return;
+            await window.cloud.deleteTimelinePost(docId);
+            alert("削除が完了しました！");
+        };
+
+        window.handleToggleLike = async function(docId) {
+            if (!docId) return;
+            await window.cloud.toggleLike(docId, window.dbData.user.id);
+        };
+
+        window.toggleCommentBox = function(docId) {
+            const box = document.getElementById(`comment-box-${docId}`);
+            if (box) box.classList.toggle('hidden');
+        };
+
+        window.handleAddComment = async function(docId) {
+            const input = document.getElementById(`comment-input-${docId}`);
+            if (!input || !input.value.trim()) return;
+
+            const commentObj = {
+                userId: window.dbData.user.id,
+                userName: window.dbData.user.name,
+                text: input.value.trim(),
+                createdAt: Date.now()
+            };
+
+            await window.cloud.addComment(docId, commentObj);
+            input.value = '';
+        };
+
+        window.setTLFilter = function(scope) {
+            window.currentTLFilter = scope;
+            window.renderTimeline();
+        };
+
+        window.createCustomCategory = function() {
+            const name = document.getElementById('new-cat-name').value.trim();
+            const unit = document.getElementById('new-cat-unit').value.trim() || '回';
+            if (!name) return alert("カテゴリー名を入力してください");
+
+            const newCat = {
+                id: 'custom_' + Date.now(),
+                name,
+                icon: 'bi-star-fill',
+                color: '#0071e3',
+                type: 'val',
+                unit
+            };
+
+            window.dbData.cats = window.dbData.cats || [];
+            window.dbData.cats.push(newCat);
+
+            window.saveLocal();
+            window.renderCategories();
+            window.showSection('home');
+            alert(`カテゴリー「${name}」を追加しました！`);
+        };
+
+        window.handleCreateGroup = async function() {
+            const name = prompt("グループ名を入力してください", "勉強グループ");
+            if (!name) return;
+            const res = await window.cloud.createGroup(name, window.dbData.user);
+            window.dbData.user.groupCode = res.code;
+            window.dbData.user.groupName = res.name;
+            window.saveLocal();
+            if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            window.renderProfilePage();
+            alert(`グループを作成しました！\n招待コード: ${res.code}`);
+        };
+
+        window.handleJoinGroup = async function() {
+            const code = prompt("6桁の招待コードを入力してください");
+            if (!code) return;
+            const res = await window.cloud.joinGroup(code, window.dbData.user);
+            if (res.success) {
+                window.dbData.user.groupCode = code.toUpperCase();
+                window.dbData.user.groupName = res.group.name;
+                window.saveLocal();
+                if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                window.renderProfilePage();
+                alert(`グループ「${res.group.name}」に参加しました！`);
+            } else {
+                alert(res.msg);
+            }
+        };
+
+        // 🏃 Results 画面 (時間表記を (0h 45m) に統一)
+        window.renderResultsView = function() {
+            const date = document.getElementById('results-date').value;
+            const prev = new Date(new Date(date).setDate(new Date(date).getDate() - 1)).toISOString().split('T')[0];
+            const all = [...baseCats, ...(window.dbData.cats || [])];
+
+            const grid = document.getElementById('result-sum-grid');
+            if (grid) {
+                grid.innerHTML = all.filter(c => c.type !== 'todo').map(c => {
+                    const curRecs = window.dbData.records.filter(r => r.date === date && r.catId === c.id);
+                    const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s, a) => s + a.val, 0);
+                    const curMins = curRecs.reduce((s, a) => s + (a.durationMin || 0), 0);
+                    
+                    const oldRecs = window.dbData.records.filter(r => r.date === prev && r.catId === c.id);
+                    const old = (c.id === 'weight') ? (oldRecs[0]?.val || 0) : oldRecs.reduce((s, a) => s + a.val, 0);
+                    const diff = cur - old;
+                    
+                    let valDisp = '';
+                    if (c.id === 'run') {
+                        valDisp = `${cur.toFixed(1)} km <span class="text-[10px] text-gray-500 font-normal ml-0.5">(${window.formatTimeShort(curMins)})</span>`;
+                    } else if (c.type === 'time' || c.type === 'sleep') {
+                        valDisp = window.formatTime(cur);
+                    } else if (c.type === 'diary') {
+                        valDisp = `${cur}文字`;
+                    } else {
+                        valDisp = `${cur.toFixed(1)} ${c.unit}`;
+                    }
+
+                    const diffH = cur === 0 ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
+                    
+                    return cur > 0 ? `
+                        <div class="glass-card p-3 text-center">
+                            <p class="text-[8px] font-bold text-gray-400 uppercase">${c.name}</p>
+                            <p class="text-sm font-black text-blue-600">${valDisp}</p>
+                            ${diffH}
+                        </div>
+                    ` : '';
+                }).join('') || `<p class="col-span-2 text-center text-xs text-gray-400 py-4">この日の記録はありません</p>`;
+            }
+
+            const todoList = document.getElementById('result-todo-list');
+            if (todoList) {
+                todoList.innerHTML = window.dbData.todos.filter(t => t.date === date && t.done).map(t => `
+                    <div class="p-2 bg-green-50 dark:bg-green-900/20 text-[10px] rounded-lg text-green-700 dark:text-green-300 font-bold">✓ ${t.task}</div>
+                `).join('') || `<p class="text-center text-xs text-gray-400">達成した予定はありません</p>`;
+            }
+        };
+
+        window.toggleTodo = function(id) {
+            const t = window.dbData.todos.find(x => x.id === id);
+            if (t) {
+                t.done = !t.done;
+                window.saveLocal();
+                if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                    window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                }
+            }
+        };
+
+        window.updatePreCal = function() {
+            const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
+            const m = parseFloat(document.getElementById('v_mins')?.value || 0);
+            const cat = baseCats.find(c => c.id === window.currentCatId);
+            if (cat && cat.mets) {
+                const cal = Math.round(cat.mets * (window.dbData.user.weight || 65) * (h + m / 60) * 1.05);
+                document.getElementById('cal-val').innerText = `${cal} kcal`;
+            }
+        };
+
+        window.formatTime = function(h) {
+            const hr = Math.floor(h);
+            const mn = Math.round((h - hr) * 60);
+            return hr > 0 ? `${hr}h ${mn}m` : `${mn}m`;
+        };
+
+        window.formatTimeShort = function(mins) {
+            if (!mins) return '0m';
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return h > 0 ? `${h}h ${m}m` : `${m}m`;
+        };
+
+        window.saveSettings = async function() {
+            window.dbData.user.name = document.getElementById('set-name').value;
+            window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
+            window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
+            window.dbData.user.age = parseInt(document.getElementById('set-age').value || 20);
+            
+            window.saveLocal();
+            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                alert("設定を保存しました！");
+            }
+        };
+
+        window.handleAvatarFileSelect = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => {
+                window.dbData.user.avatar = ev.target.result;
+                document.getElementById('set-avatar-preview').src = ev.target.result;
+                window.saveLocal();
+            };
+            r.readAsDataURL(file);
+        };
+
+        window.renderProfilePage = function() {
+            const u = window.dbData.user;
+            const area = document.getElementById('profile-header-area');
+            if (area) {
+                area.innerHTML = `
+                    <div class="glass-card p-6 mb-6 flex flex-col items-center text-center">
+                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.name)}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover">
+                        <h2 class="text-xl font-black mt-4">${u.name}</h2>
+                        <p class="text-[10px] text-gray-400">UID: ${u.id}</p>
+                    </div>`;
+            }
+
+            const gInfo = document.getElementById('my-group-info');
+            if (gInfo) {
+                if (u.groupCode) {
+                    gInfo.innerHTML = `<p class="font-bold text-green-600">所属: ${u.groupName || 'グループ'} <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded font-mono text-sm ml-1">${u.groupCode}</span></p>`;
+                } else {
+                    gInfo.innerHTML = `<p class="text-gray-400">グループに未所属です</p>`;
+                }
+            }
+        };
+
+        window.updateRankList = function(id) {
+            const u = window.dbData.user;
+            window.rankCatId = id;
+
+            const cat = baseCats.find(c => c.id === window.rankCatId) || baseCats[0];
+            const unitStr = cat ? cat.unit : '';
+
+            const scopeTabs = document.getElementById('rank-scope-tabs');
+            if (scopeTabs) {
+                scopeTabs.innerHTML = `
+                    <button onclick="window.setRankScope('global')" class="chip ${window.currentRankScope === 'global' ? 'active' : ''}">🌐 グローバル</button>
+                    ${u.groupCode ? `<button onclick="window.setRankScope('group')" class="chip ${window.currentRankScope === 'group' ? 'active' : ''}">👥 グループ内 (${u.groupName || u.groupCode})</button>` : ''}
+                `;
+            }
+
+            const filters = document.getElementById('rank-filters');
+            if (filters) {
+                filters.innerHTML = baseCats.filter(c => c.type !== 'todo').map(c => `
+                    <button onclick="window.updateRankList('${c.id}')" class="chip ${window.rankCatId === c.id ? 'active' : ''}">${c.name}</button>
+                `).join('');
+            }
+            
+            const myV = window.dbData.records.filter(r => r.catId === window.rankCatId).reduce((s, a) => s + a.val, 0);
+            
+            let valFormatted = `${myV.toFixed(1)} ${unitStr}`;
+            if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
+                valFormatted = window.formatTime(myV);
+            } else if (cat && cat.type === 'diary') {
+                valFormatted = `${myV} 文字`;
+            }
+
+            const display = document.getElementById('ranking-display');
+            if (display) {
+                display.innerHTML = `
+                    <div class="flex items-center p-4 bg-white/50 dark:bg-white/5">
+                        <span class="w-8 font-black text-yellow-500">1</span>
+                        <span class="flex-1 font-bold text-sm">${window.dbData.user.name} (あなた)</span>
+                        <span class="font-black text-blue-600 text-xs">${valFormatted}</span>
+                    </div>`;
+            }
+        };
+
+        window.setRankScope = function(scope) {
+            window.currentRankScope = scope;
+            window.updateRankList(window.rankCatId);
+        };
+
+        // Firebase Auth 監視
+        onAuthStateChanged(auth, async (user) => {
+            const loginScreen = document.getElementById('login-screen');
+            const appShell = document.getElementById('app-shell');
+
+            if (user) {
+                loginScreen.style.display = 'none';
+                appShell.style.display = 'block';
+
+                window.dbData.user.name = user.displayName || window.dbData.user.name || "User";
+                window.dbData.user.id = user.uid;
+                window.dbData.user.avatar = user.photoURL || window.dbData.user.avatar;
+
+                window.initApp();
+
+                try {
+                    const cloudData = await window.cloud.getUserData(user.uid);
+                    if (cloudData) {
+                        window.dbData = { ...window.dbData, ...cloudData };
+                        window.saveLocal();
+                        window.initApp();
+                    }
+                    await window.cloud.saveAllUserData(user.uid, window.dbData);
+                } catch(e) {
+                    console.warn("クラウド同期処理スキップ:", e);
+                }
+
+                try {
+                    window.cloud.listenTimeline((posts) => {
+                        window.allPosts = posts;
+                        window.renderTimeline();
+                    });
+                } catch(e) {
+                    console.warn("TL受信スキップ:", e);
+                }
+            } else {
+                loginScreen.style.display = 'flex';
+                appShell.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
