@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.6</title>
+    <title>Satoz Diary Ver. α.7</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -64,7 +64,7 @@
 </head>
 <body>
 
-    <!-- 🌟 再読み込み（Pull-to-refresh）時のログイン画面一瞬映り防止スクリプト -->
+    <!-- Safari Pull-to-refresh チラつき防止 -->
     <script>
         (function() {
             try {
@@ -126,7 +126,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.6</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.7</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -274,7 +274,7 @@
                 
                 <div id="rank-scope-tabs" class="flex gap-2 mb-3 overflow-x-auto pb-1"></div>
                 <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
-                <div id="ranking-display" class="glass-card overflow-hidden"></div>
+                <div id="ranking-display" class="glass-card overflow-hidden divide-y divide-black/5 dark:divide-white/5"></div>
             </section>
 
             <!-- Profile ＆ グループ -->
@@ -346,7 +346,7 @@
     <!-- Firebase ＆ アプリ完全スクリプト -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, onSnapshot, collection, query, orderBy, limit, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -511,6 +511,13 @@
                 if (!snap.exists()) return { success: false, msg: "グループが見つかりません" };
                 await updateDoc(ref, { members: arrayUnion({ uid: user.id, name: user.name, avatar: user.avatar }) });
                 return { success: true, group: snap.data() };
+            },
+            getAllUsersData: async () => {
+                if (window.isDemoMode || !db) return [];
+                try {
+                    const snap = await getDocs(collection(db, "users"));
+                    return snap.docs.map(doc => doc.data());
+                } catch(e) { console.error(e); return []; }
             }
         };
 
@@ -718,6 +725,8 @@
                     mainValStr = window.formatTime(val);
                 }
 
+                const myGroups = (window.dbData.user.groups || []).map(g => g.code);
+
                 const post = {
                     id: Date.now(),
                     catId: window.currentCatId,
@@ -732,7 +741,8 @@
                     photo: window.currentRecPhotoData,
                     userId: window.dbData.user.id,
                     userName: window.dbData.user.name,
-                    userAvatar: window.dbData.user.avatar
+                    userAvatar: window.dbData.user.avatar,
+                    userGroups: myGroups
                 };
 
                 window.dbData.records.unshift(post);
@@ -856,6 +866,7 @@
             alert(`カテゴリー「${cat.name}」を削除しました。`);
         };
 
+        // 🌟 タイムライン描画（新UI＆グループ判定修正）
         window.renderTimeline = function() {
             const list = document.getElementById('feed-list');
             const banner = document.getElementById('tl-group-banner');
@@ -873,9 +884,17 @@
 
             if (!list) return;
 
+            const allCats = [...baseCats, ...(window.dbData.cats || [])];
             let filteredPosts = window.allPosts || [];
+
+            // グループ絞り込み判定
             if (window.currentTLFilter !== 'global') {
-                filteredPosts = filteredPosts.filter(p => p.groupCode === window.currentTLFilter);
+                filteredPosts = filteredPosts.filter(p => {
+                    if (p.userGroups && Array.isArray(p.userGroups)) {
+                        return p.userGroups.includes(window.currentTLFilter);
+                    }
+                    return p.groupCode === window.currentTLFilter;
+                });
             }
 
             if (filteredPosts.length === 0) {
@@ -889,15 +908,29 @@
                 const isLiked = likes.includes(u.id);
                 const isMyPost = (p.userId === u.id) || (p.userName === u.name);
 
+                const catObj = allCats.find(c => c.id === p.catId);
+                const catIcon = catObj ? catObj.icon : 'bi-pencil-square';
+                const catColor = catObj ? catObj.color : '#0071e3';
+
                 return `
                 <div class="glass-card p-4 text-left shadow-sm relative">
-                    <div class="flex items-center justify-between mb-2">
+                    <!-- 新ヘッダーUI: [左: アイコン+名前] --- [中央: カテゴリーアイコン+名前] --- [右: 削除ボタン] -->
+                    <div class="flex items-center justify-between mb-3 pb-2 border-b border-black/5 dark:border-white/5">
                         <div class="flex items-center gap-2">
-                            <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-6 h-6 rounded-full object-cover">
-                            <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName || '記録'}・${p.userName || '匿名'}</p>
+                            <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-7 h-7 rounded-full object-cover border border-gray-200 shadow-sm">
+                            <span class="font-bold text-xs text-gray-800 dark:text-gray-200">${p.userName || '匿名'}</span>
                         </div>
-                        ${isMyPost && p.docId ? `<button onclick="window.handleDeletePost('${p.docId}')" class="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md hover:bg-red-100">🗑️ 削除</button>` : ''}
+
+                        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-900/30">
+                            <i class="${catIcon} text-base" style="color: ${catColor}"></i>
+                            <span class="font-black text-xs text-blue-600 dark:text-blue-300">${p.catName || '記録'}</span>
+                        </div>
+
+                        <div>
+                            ${isMyPost && p.docId ? `<button onclick="window.handleDeletePost('${p.docId}')" class="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md hover:bg-red-100 transition">🗑️ 削除</button>` : ''}
+                        </div>
                     </div>
+
                     <p class="todo-title">${p.valDisp}</p>
                     ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
                     ${p.photo ? `<img src="${p.photo}" onclick="window.openImageModal('${p.photo}')" class="w-24 h-24 rounded-xl object-cover mt-2 cursor-pointer border border-black/10 hover:opacity-90 transition">` : ''}
@@ -1302,7 +1335,8 @@
             }
         };
 
-        window.updateRankList = function(id) {
+        // 🌟 全ユーザー・グループ別ランキング集計＆描画
+        window.updateRankList = async function(id) {
             const u = window.dbData.user;
             window.rankCatId = id;
 
@@ -1326,30 +1360,89 @@
                     <button onclick="window.updateRankList('${c.id}')" class="chip ${window.rankCatId === c.id ? 'active' : ''}">${c.name}</button>
                 `).join('');
             }
-            
-            let myV = 0;
-            if (window.rankCatId === 'weight') {
-                const weightRecs = window.dbData.records.filter(r => r.catId === 'weight');
-                myV = weightRecs.length > 0 ? weightRecs[0].val : (u.weight || 65);
+
+            let usersList = [];
+
+            if (!window.isDemoMode && window.cloud.getAllUsersData) {
+                usersList = await window.cloud.getAllUsersData();
+            }
+
+            // データがない/デモモード時のモックデータ生成
+            if (usersList.length === 0) {
+                usersList = [
+                    { user: { id: u.id, name: u.name + " (あなた)", avatar: u.avatar, groups: u.groups }, records: window.dbData.records },
+                    { user: { id: 'mock_1', name: 'タロウ', avatar: 'https://ui-avatars.com/api/?name=Taro', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 3.5 }, { catId: 'run', val: 5.0 }, { catId: 'weight', val: 62 }] },
+                    { user: { id: 'mock_2', name: 'ハナコ', avatar: 'https://ui-avatars.com/api/?name=Hanako', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 5.0 }, { catId: 'run', val: 2.0 }, { catId: 'weight', val: 48 }] },
+                    { user: { id: 'mock_3', name: 'ケンジ', avatar: 'https://ui-avatars.com/api/?name=Kenji', groups: [] }, records: [{ catId: 'study', val: 1.5 }, { catId: 'run', val: 8.0 }, { catId: 'weight', val: 70 }] }
+                ];
             } else {
-                myV = window.dbData.records.filter(r => r.catId === window.rankCatId).reduce((s, a) => s + a.val, 0);
+                // 自分のローカルデータを最新としてマージ
+                const myIndex = usersList.findIndex(x => x.user?.id === u.id);
+                if (myIndex >= 0) {
+                    usersList[myIndex] = { user: u, records: window.dbData.records };
+                } else {
+                    usersList.push({ user: u, records: window.dbData.records });
+                }
             }
-            
-            let valFormatted = `${myV.toFixed(1)} ${unitStr}`;
-            if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
-                valFormatted = window.formatTime(myV);
-            } else if (cat && cat.type === 'diary') {
-                valFormatted = `${myV} 文字`;
+
+            // グループ絞り込み
+            if (window.currentRankScope !== 'global') {
+                usersList = usersList.filter(uData => {
+                    const gList = uData.user?.groups || [];
+                    return gList.some(g => g.code === window.currentRankScope);
+                });
             }
+
+            // ランキング集計ソート
+            const rankedUsers = usersList.map(uData => {
+                const recs = uData.records || [];
+                let val = 0;
+                if (window.rankCatId === 'weight') {
+                    const wRecs = recs.filter(r => r.catId === 'weight');
+                    val = wRecs.length > 0 ? wRecs[0].val : (uData.user?.weight || 60);
+                } else {
+                    val = recs.filter(r => r.catId === window.rankCatId).reduce((s, a) => s + (a.val || 0), 0);
+                }
+                return {
+                    user: uData.user || { name: '匿名' },
+                    val: val
+                };
+            }).sort((a, b) => b.val - a.val);
 
             const display = document.getElementById('ranking-display');
             if (display) {
-                display.innerHTML = `
-                    <div class="flex items-center p-4 bg-white/50 dark:bg-white/5">
-                        <span class="w-8 font-black text-yellow-500">1</span>
-                        <span class="flex-1 font-bold text-sm">${window.dbData.user.name} (あなた)</span>
-                        <span class="font-black text-blue-600 text-xs">${valFormatted}</span>
-                    </div>`;
+                if (rankedUsers.length === 0) {
+                    display.innerHTML = `<p class="p-6 text-center text-xs text-gray-400">データがありません</p>`;
+                    return;
+                }
+
+                display.innerHTML = rankedUsers.map((item, index) => {
+                    const rankNum = index + 1;
+                    let rankBadge = `<span class="w-6 font-black text-gray-400 text-center">${rankNum}</span>`;
+                    if (rankNum === 1) rankBadge = `<span class="w-6 text-lg text-center">🥇</span>`;
+                    if (rankNum === 2) rankBadge = `<span class="w-6 text-lg text-center">🥈</span>`;
+                    if (rankNum === 3) rankBadge = `<span class="w-6 text-lg text-center">🥉</span>`;
+
+                    let valFormatted = `${item.val.toFixed(1)} ${unitStr}`;
+                    if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
+                        valFormatted = window.formatTime(item.val);
+                    } else if (cat && cat.type === 'diary') {
+                        valFormatted = `${item.val} 文字`;
+                    }
+
+                    const isMe = item.user.id === u.id;
+
+                    return `
+                        <div class="flex items-center justify-between p-4 ${isMe ? 'bg-blue-50/60 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''}">
+                            <div class="flex items-center gap-3">
+                                ${rankBadge}
+                                <img src="${item.user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(item.user.name)}" class="w-8 h-8 rounded-full object-cover border border-gray-200">
+                                <span class="font-bold text-xs ${isMe ? 'text-blue-600 dark:text-blue-400' : ''}">${item.user.name} ${isMe ? '(あなた)' : ''}</span>
+                            </div>
+                            <span class="font-black text-xs text-blue-600 dark:text-blue-300">${valFormatted}</span>
+                        </div>
+                    `;
+                }).join('');
             }
         };
 
