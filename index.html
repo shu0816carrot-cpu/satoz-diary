@@ -1,9 +1,30 @@
+ご質問・ご指摘誠にありがとうございます！おっしゃる通りです！
+
+前回のロジックでは「日付（YYYY-MM-DD）」のみで比較していたため、**「同じ日（今日など）の中で、朝8時の体重と昼14時の体重を後から入力した場合」** に時間（hh:mm）の前後関係が反映できておりませんでした。
+
+そのため、**「日付 ＋ 時刻 (YYYY-MM-DD HH:mm)」を組み合わせたミリ秒単位の正確な最新日時比較**にバージョンアップした **`Satoz Diary Ver. α.13`** を作成いたしました！
+
+---
+
+### ⏰ 今回の改善点（`Satoz Diary Ver. α.13`）
+
+- **日付だけでなく「時刻（時間）」も含めた最新日時判定**
+  - 体重記録を保存する際、`日付（date）` ＋ `時刻（time）` を結合した**「日時（YYYY-MM-DD HH:mm）」**で全記録と比較します。
+  - 例：同じ「今日」の記録であっても、
+    - 08:00 の記録の後に **14:00 の記録**を入れた場合 ➔ **最新と判定されプロフィール体重更新！**
+    - 14:00 の記録の後に **朝08:00 の過去記録**を入れた場合 ➔ **過去と判定されプロフィール体重は上書きされない！**
+
+---
+
+以下が最新の**「Satoz Diary Ver. α.13」完全版 HTML コード**です！
+
+```html
 <!DOCTYPE html>
 <html lang="ja" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.9</title>
+    <title>Satoz Diary Ver. α.13</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -46,8 +67,9 @@
                 window.initApp();
             } else {
                 document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-                const home = document.getElementById('home');
-                if (home) home.classList.add('active');
+                const lastTab = localStorage.getItem('sz_active_tab') || 'home';
+                const target = document.getElementById(lastTab) || document.getElementById('home');
+                if (target) target.classList.add('active');
             }
         };
 
@@ -126,7 +148,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.9</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.13</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -151,7 +173,7 @@
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
                 <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.9</span>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.13</span>
             </div>
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
@@ -277,7 +299,10 @@
                 
                 <div id="rank-scope-tabs" class="flex gap-2 mb-3 overflow-x-auto pb-1"></div>
                 <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
-                <div id="ranking-display" class="glass-card overflow-hidden divide-y divide-black/5 dark:divide-white/5"></div>
+                <div id="ranking-display-card" class="glass-card overflow-hidden">
+                    <div id="ranking-display" class="divide-y divide-black/5 dark:divide-white/5"></div>
+                    <div id="rank-add-category-box" class="hidden"></div>
+                </div>
             </section>
 
             <!-- Profile ＆ グループ -->
@@ -322,7 +347,7 @@
 
                     <div class="flex flex-col items-center gap-2 pt-2">
                         <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
-                        <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">Satoz Diary アイコン変更</button>
+                        <button type="button" onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline cursor-pointer">Satoz Diary アイコン変更</button>
                         <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="window.handleAvatarFileSelect(event)">
                     </div>
                     <div>
@@ -333,18 +358,28 @@
                         <label class="text-[10px] font-bold text-gray-400 uppercase">Satoz Diary ユーザーID (UID / 自由変更)</label>
                         <input type="text" id="set-id" class="w-full mt-1 text-xs font-mono font-bold" placeholder="例: satoz_user123">
                     </div>
+
+                    <div>
+                        <label class="text-[10px] font-bold text-blue-500 uppercase flex items-center gap-1">
+                            <i class="bi bi-cake2-fill"></i>
+                            <span>生年月日 (年齢の自動計算用)</span>
+                        </label>
+                        <input type="date" id="set-birthdate" class="w-full mt-1 text-xs font-bold" onchange="window.handleBirthdateChange(this.value)">
+                    </div>
+
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="text-[10px] font-bold text-gray-400 uppercase">体重(kg)</label>
                             <input type="number" id="set-weight" class="w-full mt-1">
+                            <p class="text-[8px] text-blue-500 font-bold mt-0.5">※最新日時で自動連動</p>
                         </div>
                         <div>
                             <label class="text-[10px] font-bold text-gray-400 uppercase">身長(cm)</label>
                             <input type="number" id="set-height" class="w-full mt-1">
                         </div>
                         <div>
-                            <label class="text-[10px] font-bold text-gray-400 uppercase">年齢</label>
-                            <input type="number" id="set-age" class="w-full mt-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">年齢 (自動算定)</label>
+                            <input type="number" id="set-age" class="w-full mt-1 opacity-80" readonly>
                         </div>
                     </div>
                     <button onclick="window.saveSettings()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">Satoz Diary 設定を更新保存</button>
@@ -353,7 +388,7 @@
             </section>
         </main>
 
-        <!-- タブバー (TL -> 広場) -->
+        <!-- タブバー -->
         <nav class="tab-bar">
             <button onclick="window.showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
             <button onclick="window.showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>広場</div></button>
@@ -390,7 +425,7 @@
 
         const localDb = JSON.parse(localStorage.getItem('sz_v11_db') || '{}');
         window.dbData = {
-            user: Object.assign({ name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null, groups: [] }, localDb.user || {}),
+            user: Object.assign({ name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, birthdate: "2004-01-01", avatar: null, groups: [] }, localDb.user || {}),
             records: Array.isArray(localDb.records) ? localDb.records : [],
             todos: Array.isArray(localDb.todos) ? localDb.todos : [],
             cats: Array.isArray(localDb.cats) ? localDb.cats : []
@@ -404,6 +439,7 @@
         window.currentCatId = '';
         window.rankCatId = 'study';
         window.isTodoEditMode = false;
+        window.tempSelectedAvatar = null;
 
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
@@ -423,6 +459,26 @@
 
         const presetIcons = ['bi-book', 'bi-fire', 'bi-person-walking', 'bi-speedometer2', 'bi-chat-quote', 'bi-moon-stars', 'bi-cup-hot', 'bi-heart-pulse', 'bi-controller', 'bi-music-note', 'bi-droplet', 'bi-capsule', 'bi-star-fill', 'bi-trophy', 'bi-bicycle'];
         let selectedIcon = presetIcons[0];
+
+        window.calcAgeFromBirthdate = function(birthdateStr) {
+            if (!birthdateStr) return 20;
+            const birth = new Date(birthdateStr);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+            return age >= 0 ? age : 0;
+        };
+
+        window.handleBirthdateChange = function(val) {
+            const age = window.calcAgeFromBirthdate(val);
+            window.dbData.user.birthdate = val;
+            window.dbData.user.age = age;
+            const ageInput = document.getElementById('set-age');
+            if (ageInput) ageInput.value = age;
+        };
 
         window.cloud = {
             login: async () => {
@@ -470,6 +526,7 @@
             },
             logout: async () => {
                 localStorage.removeItem('sz_v11_db');
+                localStorage.removeItem('sz_active_tab');
                 if (auth) await signOut(auth);
                 window.location.reload();
             },
@@ -556,7 +613,12 @@
             if (document.getElementById('set-id')) document.getElementById('set-id').value = u.id || '';
             if (document.getElementById('set-weight')) document.getElementById('set-weight').value = u.weight || 65;
             if (document.getElementById('set-height')) document.getElementById('set-height').value = u.height || 170;
-            if (document.getElementById('set-age')) document.getElementById('set-age').value = u.age || 20;
+            if (document.getElementById('set-birthdate')) document.getElementById('set-birthdate').value = u.birthdate || '2004-01-01';
+            
+            const ageVal = window.calcAgeFromBirthdate(u.birthdate || '2004-01-01');
+            window.dbData.user.age = ageVal;
+            if (document.getElementById('set-age')) document.getElementById('set-age').value = ageVal;
+
             if (document.getElementById('set-avatar-preview')) document.getElementById('set-avatar-preview').src = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`;
             
             if (document.getElementById('results-date')) document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
@@ -571,7 +633,9 @@
             window.renderCategories();
             window.renderAll();
             window.renderResultsView();
-            window.showSection('home');
+            
+            const savedTab = localStorage.getItem('sz_active_tab') || 'home';
+            window.showSection(savedTab);
 
             if (!window.clockTimer) {
                 window.clockTimer = setInterval(() => {
@@ -589,6 +653,8 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             const navBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.getAttribute('onclick')?.includes(`'${id}'`));
             if (navBtn) navBtn.classList.add('active');
+
+            localStorage.setItem('sz_active_tab', id);
 
             if (id === 'ranking') window.updateRankList(window.rankCatId);
             if (id === 'results') window.renderResultsView();
@@ -697,10 +763,11 @@
             document.getElementById('input-modal').classList.add('hidden');
         };
 
+        // 🌟【最先端】日付＋時刻（YYYY-MM-DD HH:mm）による完全最新日時判定
         window.saveRecord = async function() {
             const memo = document.getElementById('rec-comment').value.trim();
             const date = document.getElementById('rec-date').value;
-            const time = document.getElementById('rec-time').value;
+            const time = document.getElementById('rec-time').value || '00:00';
             let val = 0;
             let durationMin = 0;
             const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === window.currentCatId);
@@ -740,9 +807,27 @@
                     val = parseFloat(document.getElementById('v1')?.value || 0);
                 }
                 
+                // 🌟 日付＋時刻（YYYY-MM-DD HH:mm）をミリ秒変換して既存全記録と厳密比較！
                 if (window.currentCatId === 'weight') {
-                    window.dbData.user.weight = val;
-                    window.dbData.records = window.dbData.records.filter(r => !(r.date === date && r.catId === 'weight'));
+                    const currentDateTimeStr = `${date}T${time}`;
+                    const currentTs = new Date(currentDateTimeStr).getTime();
+                    
+                    const existingWeightRecords = window.dbData.records.filter(r => r.catId === 'weight');
+                    
+                    // 全体重記録の中で今回入力された記録の日時が最も新しいか判定
+                    const isLatestDateTime = existingWeightRecords.every(r => {
+                        const existingTs = new Date(`${r.date}T${r.time || '00:00'}`).getTime();
+                        return existingTs <= currentTs;
+                    });
+                    
+                    if (isLatestDateTime) {
+                        window.dbData.user.weight = val;
+                        const setW = document.getElementById('set-weight');
+                        if (setW) setW.value = val;
+                    }
+                    
+                    // 同一日・同一時刻の過去ログ重複整理
+                    window.dbData.records = window.dbData.records.filter(r => !(r.date === date && r.time === time && r.catId === 'weight'));
                 }
 
                 let mainValStr = `${val.toFixed(1)} ${cat ? cat.unit : ''}`;
@@ -760,6 +845,10 @@
                     id: Date.now(),
                     catId: window.currentCatId,
                     catName: cat ? cat.name : "記録",
+                    catIcon: cat ? cat.icon : 'bi-pencil-square',
+                    catUnit: cat ? cat.unit : '',
+                    catType: cat ? cat.type : 'val',
+                    isCustom: cat ? !!cat.isCustom : false,
                     subCategory: subCatVal,
                     val: val,
                     durationMin: durationMin,
@@ -898,6 +987,35 @@
             alert(`カテゴリー「${cat.name}」を削除しました。`);
         };
 
+        window.addCategoryFromPost = async function(catName, catIcon, catUnit, catType) {
+            const myCats = [...baseCats, ...(window.dbData.cats || [])];
+            if (myCats.some(c => c.name === catName)) {
+                return alert(`カテゴリー「${catName}」は既にあなたの記録に追加されています！`);
+            }
+
+            const newCat = {
+                id: 'custom_' + Date.now(),
+                name: catName,
+                icon: catIcon || 'bi-star-fill',
+                color: '#0071e3',
+                type: catType || 'val',
+                unit: catUnit || '回',
+                isCustom: true
+            };
+
+            window.dbData.cats = window.dbData.cats || [];
+            window.dbData.cats.push(newCat);
+
+            window.saveLocal();
+            const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+            if (window.cloud && window.cloud.saveAllUserData) {
+                await window.cloud.saveAllUserData(googleUid, window.dbData);
+            }
+
+            window.renderCategories();
+            alert(`🎉 カテゴリー「${catName}」をあなたの記録に追加しました！\nホーム画面から記録できるようになりました。`);
+        };
+
         window.renderTimeline = function() {
             const list = document.getElementById('feed-list');
             const banner = document.getElementById('tl-group-banner');
@@ -915,7 +1033,7 @@
 
             if (!list) return;
 
-            const allCats = [...baseCats, ...(window.dbData.cats || [])];
+            const allMyCats = [...baseCats, ...(window.dbData.cats || [])];
             let filteredPosts = window.allPosts || [];
 
             if (window.currentTLFilter !== 'global') {
@@ -938,9 +1056,11 @@
                 const isLiked = likes.includes(u.id);
                 const isMyPost = (p.userId === u.id) || (p.userName === u.name);
 
-                const catObj = allCats.find(c => c.id === p.catId);
-                const catIcon = catObj ? catObj.icon : 'bi-pencil-square';
+                const catObj = allMyCats.find(c => c.name === p.catName || c.id === p.catId);
+                const catIcon = p.catIcon || (catObj ? catObj.icon : 'bi-pencil-square');
                 const catColor = catObj ? catObj.color : '#0071e3';
+
+                const hasCategory = allMyCats.some(c => c.name === p.catName);
 
                 return `
                 <div class="glass-card p-4 text-left shadow-sm relative">
@@ -953,6 +1073,9 @@
                         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-900/30">
                             <i class="${catIcon} text-base" style="color: ${catColor}"></i>
                             <span class="font-black text-xs text-blue-600 dark:text-blue-300">${p.catName || '記録'}</span>
+                            ${!hasCategory ? `
+                                <button onclick="window.addCategoryFromPost('${p.catName}', '${catIcon}', '${p.catUnit || ''}', '${p.catType || 'val'}')" class="text-[9px] font-black text-white bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded-full shadow transition active:scale-95">＋ 追加</button>
+                            ` : ''}
                         </div>
 
                         <div>
@@ -1156,7 +1279,7 @@
             const u = window.dbData.user;
             const w = u.weight || 65;
             const h = u.height || 170;
-            const a = u.age || 20;
+            const a = window.calcAgeFromBirthdate(u.birthdate || '2004-01-01');
 
             const bmr = Math.round((10 * w) + (6.25 * h) - (5 * a) + 5);
 
@@ -1312,23 +1435,39 @@
             return h > 0 ? `${h}h ${m}m` : `${m}m`;
         };
 
-        // 🌟 Satoz Diary アカウント設定のFirebase直接保存送信 ＆ 通知
+        window.handleAvatarFileSelect = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => {
+                window.tempSelectedAvatar = ev.target.result;
+                const prev = document.getElementById('set-avatar-preview');
+                if (prev) prev.src = window.tempSelectedAvatar;
+            };
+            r.readAsDataURL(file);
+        };
+
         window.saveSettings = async function() {
             const newName = document.getElementById('set-name').value.trim();
             const newId = document.getElementById('set-id').value.trim();
+            const birthdate = document.getElementById('set-birthdate').value;
 
             if (!newName) return alert("Satoz Diary 表示名を入力してください");
             if (!newId) return alert("Satoz Diary ユーザーIDを入力してください");
 
             window.dbData.user.name = newName;
             window.dbData.user.id = newId;
+            window.dbData.user.birthdate = birthdate;
+            window.dbData.user.age = window.calcAgeFromBirthdate(birthdate);
+
+            if (window.tempSelectedAvatar) {
+                window.dbData.user.avatar = window.tempSelectedAvatar;
+            }
             window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
             window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
-            window.dbData.user.age = parseInt(document.getElementById('set-age').value || 20);
             
             window.saveLocal();
             
-            // 投稿・記録と同じ扱いで、Firebaseクラウドに確実に直接データを送信保存！
             const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
             if (window.cloud && window.cloud.saveAllUserData) {
                 await window.cloud.saveAllUserData(googleUid, window.dbData);
@@ -1336,21 +1475,7 @@
 
             window.renderProfilePage();
             window.renderTimeline();
-            
-            // ポップアップ表示
-            alert("保存しました！\n（FirebaseデータベースにSatoz Diaryのアカウント設定を同期・保存しました）");
-        };
-
-        window.handleAvatarFileSelect = function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const r = new FileReader();
-            r.onload = (ev) => {
-                window.dbData.user.avatar = ev.target.result;
-                document.getElementById('set-avatar-preview').src = ev.target.result;
-                window.saveLocal();
-            };
-            r.readAsDataURL(file);
+            alert("保存しました！\n（Satoz Diaryのアカウント設定をFirebaseへ正常に同期・更新しました）");
         };
 
         window.renderProfilePage = function() {
@@ -1388,8 +1513,25 @@
             const u = window.dbData.user;
             window.rankCatId = id;
 
-            const cat = baseCats.find(c => c.id === window.rankCatId) || baseCats[0];
-            const unitStr = cat ? cat.unit : '';
+            let usersList = [];
+            if (!window.isDemoMode && window.cloud.getAllUsersData) {
+                usersList = await window.cloud.getAllUsersData();
+            }
+
+            if (usersList.length === 0) {
+                usersList = [
+                    { user: { id: u.id, name: u.name + " (あなた)", avatar: u.avatar, groups: u.groups }, records: window.dbData.records, cats: window.dbData.cats },
+                    { user: { id: 'mock_1', name: 'タロウ', avatar: 'https://ui-avatars.com/api/?name=Taro', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 3.5 }, { catId: 'custom_piano', catName: 'ピアノ', val: 2.0 }, { catId: 'weight', val: 62 }] },
+                    { user: { id: 'mock_2', name: 'ハナコ', avatar: 'https://ui-avatars.com/api/?name=Hanako', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 5.0 }, { catId: 'custom_piano', catName: 'ピアノ', val: 4.5 }, { catId: 'weight', val: 48 }] }
+                ];
+            } else {
+                const myIndex = usersList.findIndex(x => x.user?.id === u.id);
+                if (myIndex >= 0) {
+                    usersList[myIndex] = { user: u, records: window.dbData.records, cats: window.dbData.cats };
+                } else {
+                    usersList.push({ user: u, records: window.dbData.records, cats: window.dbData.cats });
+                }
+            }
 
             const scopeTabs = document.getElementById('rank-scope-tabs');
             if (scopeTabs) {
@@ -1402,91 +1544,102 @@
                 `;
             }
 
+            let availableCats = [...baseCats, ...(window.dbData.cats || [])];
+            
+            if (window.currentRankScope !== 'global') {
+                const groupUsers = usersList.filter(uData => (uData.user?.groups || []).some(g => g.code === window.currentRankScope));
+                groupUsers.forEach(uData => {
+                    const uCats = uData.cats || [];
+                    const uRecs = uData.records || [];
+                    uCats.forEach(c => {
+                        if (!availableCats.some(x => x.name === c.name)) availableCats.push(c);
+                    });
+                    uRecs.forEach(r => {
+                        if (r.catName && !availableCats.some(x => x.name === r.catName)) {
+                            availableCats.push({ id: r.catId || ('custom_' + r.catName), name: r.catName, icon: r.catIcon || 'bi-star-fill', type: r.catType || 'val', unit: r.catUnit || '回', isCustom: true });
+                        }
+                    });
+                });
+            }
+
             const filters = document.getElementById('rank-filters');
             if (filters) {
-                filters.innerHTML = baseCats.filter(c => c.type !== 'todo').map(c => `
+                filters.innerHTML = availableCats.filter(c => c.type !== 'todo').map(c => `
                     <button onclick="window.updateRankList('${c.id}')" class="chip ${window.rankCatId === c.id ? 'active' : ''}">${c.name}</button>
                 `).join('');
             }
 
-            let usersList = [];
-
-            if (!window.isDemoMode && window.cloud.getAllUsersData) {
-                usersList = await window.cloud.getAllUsersData();
-            }
-
-            if (usersList.length === 0) {
-                usersList = [
-                    { user: { id: u.id, name: u.name + " (あなた)", avatar: u.avatar, groups: u.groups }, records: window.dbData.records },
-                    { user: { id: 'mock_1', name: 'タロウ', avatar: 'https://ui-avatars.com/api/?name=Taro', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 3.5 }, { catId: 'run', val: 5.0 }, { catId: 'weight', val: 62 }] },
-                    { user: { id: 'mock_2', name: 'ハナコ', avatar: 'https://ui-avatars.com/api/?name=Hanako', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 5.0 }, { catId: 'run', val: 2.0 }, { catId: 'weight', val: 48 }] },
-                    { user: { id: 'mock_3', name: 'ケンジ', avatar: 'https://ui-avatars.com/api/?name=Kenji', groups: [] }, records: [{ catId: 'study', val: 1.5 }, { catId: 'run', val: 8.0 }, { catId: 'weight', val: 70 }] }
-                ];
-            } else {
-                const myIndex = usersList.findIndex(x => x.user?.id === u.id);
-                if (myIndex >= 0) {
-                    usersList[myIndex] = { user: u, records: window.dbData.records };
-                } else {
-                    usersList.push({ user: u, records: window.dbData.records });
-                }
-            }
+            const selectedCat = availableCats.find(c => c.id === window.rankCatId) || baseCats[0];
+            const unitStr = selectedCat ? selectedCat.unit : '';
 
             if (window.currentRankScope !== 'global') {
-                usersList = usersList.filter(uData => {
-                    const gList = uData.user?.groups || [];
-                    return gList.some(g => g.code === window.currentRankScope);
-                });
+                usersList = usersList.filter(uData => (uData.user?.groups || []).some(g => g.code === window.currentRankScope));
             }
 
             const rankedUsers = usersList.map(uData => {
                 const recs = uData.records || [];
                 let val = 0;
-                if (window.rankCatId === 'weight') {
+                if (selectedCat.id === 'weight') {
                     const wRecs = recs.filter(r => r.catId === 'weight');
                     val = wRecs.length > 0 ? wRecs[0].val : (uData.user?.weight || 60);
                 } else {
-                    val = recs.filter(r => r.catId === window.rankCatId).reduce((s, a) => s + (a.val || 0), 0);
+                    val = recs.filter(r => r.catId === selectedCat.id || r.catName === selectedCat.name).reduce((s, a) => s + (a.val || 0), 0);
                 }
-                return {
-                    user: uData.user || { name: '匿名' },
-                    val: val
-                };
+                return { user: uData.user || { name: '匿名' }, val: val };
             }).sort((a, b) => b.val - a.val);
 
             const display = document.getElementById('ranking-display');
             if (display) {
                 if (rankedUsers.length === 0) {
                     display.innerHTML = `<p class="p-6 text-center text-xs text-gray-400">データがありません</p>`;
-                    return;
-                }
+                } else {
+                    display.innerHTML = rankedUsers.map((item, index) => {
+                        const rankNum = index + 1;
+                        let rankBadge = `<span class="w-6 font-black text-gray-400 text-center">${rankNum}</span>`;
+                        if (rankNum === 1) rankBadge = `<span class="w-6 text-lg text-center">🥇</span>`;
+                        if (rankNum === 2) rankBadge = `<span class="w-6 text-lg text-center">🥈</span>`;
+                        if (rankNum === 3) rankBadge = `<span class="w-6 text-lg text-center">🥉</span>`;
 
-                display.innerHTML = rankedUsers.map((item, index) => {
-                    const rankNum = index + 1;
-                    let rankBadge = `<span class="w-6 font-black text-gray-400 text-center">${rankNum}</span>`;
-                    if (rankNum === 1) rankBadge = `<span class="w-6 text-lg text-center">🥇</span>`;
-                    if (rankNum === 2) rankBadge = `<span class="w-6 text-lg text-center">🥈</span>`;
-                    if (rankNum === 3) rankBadge = `<span class="w-6 text-lg text-center">🥉</span>`;
+                        let valFormatted = `${item.val.toFixed(1)} ${unitStr}`;
+                        if (selectedCat && (selectedCat.type === 'time' || selectedCat.type === 'sleep')) {
+                            valFormatted = window.formatTime(item.val);
+                        } else if (selectedCat && selectedCat.type === 'diary') {
+                            valFormatted = `${item.val} 文字`;
+                        }
 
-                    let valFormatted = `${item.val.toFixed(1)} ${unitStr}`;
-                    if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
-                        valFormatted = window.formatTime(item.val);
-                    } else if (cat && cat.type === 'diary') {
-                        valFormatted = `${item.val} 文字`;
-                    }
+                        const isMe = item.user.id === u.id;
 
-                    const isMe = item.user.id === u.id;
-
-                    return `
-                        <div class="flex items-center justify-between p-4 ${isMe ? 'bg-blue-50/60 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''}">
-                            <div class="flex items-center gap-3">
-                                ${rankBadge}
-                                <img src="${item.user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(item.user.name)}" class="w-8 h-8 rounded-full object-cover border border-gray-200">
-                                <span class="font-bold text-xs ${isMe ? 'text-blue-600 dark:text-blue-400' : ''}">${item.user.name} ${isMe ? '(あなた)' : ''}</span>
+                        return `
+                            <div class="flex items-center justify-between p-4 ${isMe ? 'bg-blue-50/60 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''}">
+                                <div class="flex items-center gap-3">
+                                    ${rankBadge}
+                                    <img src="${item.user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(item.user.name)}" class="w-8 h-8 rounded-full object-cover border border-gray-200">
+                                    <span class="font-bold text-xs ${isMe ? 'text-blue-600 dark:text-blue-400' : ''}">${item.user.name} ${isMe ? '(あなた)' : ''}</span>
+                                </div>
+                                <span class="font-black text-xs text-blue-600 dark:text-blue-300">${valFormatted}</span>
                             </div>
-                            <span class="font-black text-xs text-blue-600 dark:text-blue-300">${valFormatted}</span>
+                        `;
+                    }).join('');
+                }
+            }
+
+            const addBox = document.getElementById('rank-add-category-box');
+            if (addBox) {
+                const myCats = [...baseCats, ...(window.dbData.cats || [])];
+                const hasCat = myCats.some(c => c.name === selectedCat.name);
+
+                if (!hasCat && selectedCat) {
+                    addBox.classList.remove('hidden');
+                    addBox.innerHTML = `
+                        <div class="p-3 bg-blue-50 dark:bg-blue-900/30 text-center border-t border-blue-200/50">
+                            <button onclick="window.addCategoryFromPost('${selectedCat.name}', '${selectedCat.icon || 'bi-star-fill'}', '${selectedCat.unit || ''}', '${selectedCat.type || 'val'}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow transition active:scale-95">
+                                ＋ このカテゴリー「${selectedCat.name}」を自分の記録に追加
+                            </button>
                         </div>
                     `;
-                }).join('');
+                } else {
+                    addBox.classList.add('hidden');
+                }
             }
         };
 
@@ -1556,3 +1709,4 @@
     </script>
 </body>
 </html>
+```
