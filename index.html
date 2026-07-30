@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.13</title>
+    <title>Satoz Diary Ver. α.14</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -11,6 +11,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- Cropper.js (画像切り取り・トリミング用) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
     <style>
         :root { --apple-bg: #f5f5f7; --apple-card: rgba(255, 255, 255, 0.85); --apple-text: #1d1d1f; --apple-accent: #0071e3; --glass: blur(25px) saturate(180%); }
@@ -77,6 +81,28 @@
         })();
     </script>
 
+    <!-- 写真トリミング（切り取り）編集モーダル -->
+    <div id="crop-modal" class="fixed inset-0 z-[25000] bg-black/90 backdrop-blur-md hidden flex flex-col items-center justify-center p-4">
+        <div class="max-w-md w-full bg-gray-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 bg-gray-800 text-white flex justify-between items-center">
+                <h3 class="font-bold text-sm">✂️ 写真の切り取り・編集</h3>
+                <button onclick="window.cancelCrop()" class="text-xs text-gray-400 font-bold">キャンセル</button>
+            </div>
+            <div class="p-4 flex-1 flex items-center justify-center overflow-hidden bg-black max-h-[60vh]">
+                <img id="crop-target-img" class="max-w-full max-h-full">
+            </div>
+            <div class="p-4 bg-gray-800 space-y-3">
+                <div class="flex justify-center gap-2">
+                    <button onclick="window.setCropRatio(1)" class="text-[10px] bg-gray-700 text-white px-3 py-1.5 rounded-lg font-bold">1:1 (正方形)</button>
+                    <button onclick="window.setCropRatio(4/3)" class="text-[10px] bg-gray-700 text-white px-3 py-1.5 rounded-lg font-bold">4:3</button>
+                    <button onclick="window.setCropRatio(16/9)" class="text-[10px] bg-gray-700 text-white px-3 py-1.5 rounded-lg font-bold">16:9</button>
+                    <button onclick="window.setCropRatio(NaN)" class="text-[10px] bg-gray-700 text-white px-3 py-1.5 rounded-lg font-bold">自由 (Free)</button>
+                </div>
+                <button onclick="window.applyCrop()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-2xl shadow-lg active:scale-95 transition">切り取りを決定（自動軽量化）</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 写真拡大用モーダル -->
     <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="window.closeImageModal()">
         <img id="image-modal-img" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
@@ -100,8 +126,8 @@
             <div class="mt-4">
                 <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="window.handleRecPhotoSelect(event)">
                 <button type="button" onclick="document.getElementById('rec-photo-input').click()" class="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-xl flex items-center gap-1.5">
-                    <i class="bi bi-camera-fill"></i>
-                    <span>📷 写真を追加</span>
+                    <i class="bi bi-crop"></i>
+                    <span>📷 写真を追加（トリミング編集）</span>
                 </button>
                 <div id="rec-photo-preview-box" class="hidden relative mt-2 w-20 h-20">
                     <img id="rec-photo-preview-img" class="w-20 h-20 rounded-xl object-cover border-2 border-blue-500/30">
@@ -127,7 +153,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.13</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.14</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -152,7 +178,7 @@
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
                 <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.13</span>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.14</span>
             </div>
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
@@ -326,7 +352,7 @@
 
                     <div class="flex flex-col items-center gap-2 pt-2">
                         <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
-                        <button type="button" onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline cursor-pointer">Satoz Diary アイコン変更</button>
+                        <button type="button" onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline cursor-pointer">Satoz Diary アイコン変更 (トリミング編集)</button>
                         <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="window.handleAvatarFileSelect(event)">
                     </div>
                     <div>
@@ -420,6 +446,10 @@
         window.isTodoEditMode = false;
         window.tempSelectedAvatar = null;
 
+        // トリミング管理
+        window.cropper = null;
+        window.currentCropTarget = null; // 'rec' or 'avatar'
+
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
             { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
@@ -457,6 +487,57 @@
             window.dbData.user.age = age;
             const ageInput = document.getElementById('set-age');
             if (ageInput) ageInput.value = age;
+        };
+
+        // 🌟 画像クロップ（トリミング）モーダル起動＆リサイズ圧縮
+        window.openCropModal = function(imageSrc, targetType) {
+            window.currentCropTarget = targetType;
+            const targetImg = document.getElementById('crop-target-img');
+            targetImg.src = imageSrc;
+
+            document.getElementById('crop-modal').classList.remove('hidden');
+
+            if (window.cropper) window.cropper.destroy();
+
+            window.cropper = new Cropper(targetImg, {
+                aspectRatio: targetType === 'avatar' ? 1 : NaN,
+                viewMode: 1,
+                autoCropArea: 0.9,
+            });
+        };
+
+        window.setCropRatio = function(ratio) {
+            if (window.cropper) window.cropper.setAspectRatio(ratio);
+        };
+
+        window.cancelCrop = function() {
+            if (window.cropper) window.cropper.destroy();
+            document.getElementById('crop-modal').classList.add('hidden');
+        };
+
+        window.applyCrop = function() {
+            if (!window.cropper) return;
+            const canvas = window.cropper.getCroppedCanvas({
+                maxWidth: 600,
+                maxHeight: 600,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+
+            // 高圧縮JPEGでデータ容量を極小化 (超軽量化)
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+            if (window.currentCropTarget === 'rec') {
+                window.currentRecPhotoData = compressedBase64;
+                document.getElementById('rec-photo-preview-img').src = compressedBase64;
+                document.getElementById('rec-photo-preview-box').classList.remove('hidden');
+            } else if (window.currentCropTarget === 'avatar') {
+                window.tempSelectedAvatar = compressedBase64;
+                const prev = document.getElementById('set-avatar-preview');
+                if (prev) prev.src = compressedBase64;
+            }
+
+            window.cancelCrop();
         };
 
         window.cloud = {
@@ -647,9 +728,7 @@
             if (!file) return;
             const r = new FileReader();
             r.onload = (ev) => {
-                window.currentRecPhotoData = ev.target.result;
-                document.getElementById('rec-photo-preview-img').src = window.currentRecPhotoData;
-                document.getElementById('rec-photo-preview-box').classList.remove('hidden');
+                window.openCropModal(ev.target.result, 'rec');
             };
             r.readAsDataURL(file);
         };
@@ -704,6 +783,22 @@
                         <input type="time" id="todo-exact-time" class="w-full text-xs" value="12:00">
                     </div>
                 `;
+            } else if (id === 'weight') {
+                fields.innerHTML += `
+                    <input type="number" id="v1" step="0.1" placeholder="体重 (kg) を入力" class="w-full text-xs font-bold">
+                    <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl space-y-2 border border-blue-200">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="weight-detail-check" onchange="document.getElementById('weight-detail-fields').classList.toggle('hidden', !this.checked)">
+                            <label for="weight-detail-check" class="text-xs font-bold text-blue-600 dark:text-blue-300">🩺 詳細を記入する (任意)</label>
+                        </div>
+                        <div id="weight-detail-fields" class="hidden grid grid-cols-2 gap-2 pt-1 text-[10px]">
+                            <div>BMI<input type="number" step="0.1" id="w_bmi" placeholder="例: 22.5" class="w-full mt-1 text-xs"></div>
+                            <div>体脂肪率 (%)<input type="number" step="0.1" id="w_fat" placeholder="例: 18.2" class="w-full mt-1 text-xs"></div>
+                            <div>筋肉量 (kg)<input type="number" step="0.1" id="w_muscle" placeholder="例: 45.0" class="w-full mt-1 text-xs"></div>
+                            <div>骨量 (kg)<input type="number" step="0.1" id="w_bone" placeholder="例: 2.8" class="w-full mt-1 text-xs"></div>
+                        </div>
+                    </div>
+                `;
             } else if (id === 'run') {
                 fields.innerHTML += `<input type="number" id="v_dist" placeholder="走った距離(km)" class="w-full mb-2 text-xs" oninput="window.updatePreCal()">
                     <div class="flex gap-2 justify-center items-center">
@@ -712,7 +807,13 @@
                     </div>`;
                 window.updatePreCal();
             } else if (id === 'diary') {
-                fields.innerHTML += `<p class="text-xs text-blue-500 font-bold bg-blue-50 dark:bg-blue-900/30 p-2.5 rounded-xl">✍️ 下の枠に日記の文章を入力してください（文字数は自動カウントされます）</p>`;
+                fields.innerHTML += `
+                    <p class="text-xs text-blue-500 font-bold bg-blue-50 dark:bg-blue-900/30 p-2.5 rounded-xl">✍️ 下の枠に日記の文章を入力してください（文字数は自動カウントされます）</p>
+                    <div class="flex items-center gap-2 p-2 bg-black/5 dark:bg-white/5 rounded-xl">
+                        <input type="checkbox" id="diary-private-check">
+                        <label for="diary-private-check" class="text-xs font-bold text-gray-700 dark:text-gray-200">🔒 日記の内容を非表示にする (文字数のみ公開)</label>
+                    </div>
+                `;
             } else if (cat && (cat.type === 'time' || cat.id === 'exercise')) {
                 fields.innerHTML += `
                     <div class="flex gap-2 justify-center items-center">
@@ -742,13 +843,16 @@
             document.getElementById('input-modal').classList.add('hidden');
         };
 
-        // 🌟【最先端】日付＋時刻（YYYY-MM-DD HH:mm）による完全最新日時判定
+        // 🌟 日付＋時刻による厳密な最新日時判定
         window.saveRecord = async function() {
             const memo = document.getElementById('rec-comment').value.trim();
             const date = document.getElementById('rec-date').value;
             const time = document.getElementById('rec-time').value || '00:00';
             let val = 0;
             let durationMin = 0;
+            let isPrivateDiary = false;
+            let weightDetails = null;
+
             const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === window.currentCatId);
 
             let subCatVal = '';
@@ -774,6 +878,7 @@
                     durationMin = Math.round(hrs * 60 + mins);
                 } else if (window.currentCatId === 'diary') {
                     val = memo.length;
+                    isPrivateDiary = document.getElementById('diary-private-check')?.checked || false;
                 } else if (cat && cat.type === 'time') {
                     val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
                     durationMin = Math.round(val * 60);
@@ -785,15 +890,22 @@
                 } else {
                     val = parseFloat(document.getElementById('v1')?.value || 0);
                 }
-                
-                // 🌟 日付＋時刻（YYYY-MM-DD HH:mm）をミリ秒変換して既存全記録と厳密比較！
+
                 if (window.currentCatId === 'weight') {
+                    const hasDetail = document.getElementById('weight-detail-check')?.checked;
+                    if (hasDetail) {
+                        weightDetails = {
+                            bmi: document.getElementById('w_bmi')?.value || null,
+                            fat: document.getElementById('w_fat')?.value || null,
+                            muscle: document.getElementById('w_muscle')?.value || null,
+                            bone: document.getElementById('w_bone')?.value || null,
+                        };
+                    }
+
                     const currentDateTimeStr = `${date}T${time}`;
                     const currentTs = new Date(currentDateTimeStr).getTime();
-                    
                     const existingWeightRecords = window.dbData.records.filter(r => r.catId === 'weight');
                     
-                    // 全体重記録の中で今回入力された記録の日時が最も新しいか判定
                     const isLatestDateTime = existingWeightRecords.every(r => {
                         const existingTs = new Date(`${r.date}T${r.time || '00:00'}`).getTime();
                         return existingTs <= currentTs;
@@ -804,8 +916,7 @@
                         const setW = document.getElementById('set-weight');
                         if (setW) setW.value = val;
                     }
-                    
-                    // 同一日・同一時刻の過去ログ重複整理
+
                     window.dbData.records = window.dbData.records.filter(r => !(r.date === date && r.time === time && r.catId === 'weight'));
                 }
 
@@ -813,7 +924,7 @@
                 if (window.currentCatId === 'run') {
                     mainValStr = `${val.toFixed(1)} km (${window.formatTimeShort(durationMin)})`;
                 } else if (window.currentCatId === 'diary') {
-                    mainValStr = `${val} 文字`;
+                    mainValStr = isPrivateDiary ? `🔒 内容非公開 (${val}文字)` : `${val} 文字`;
                 } else if (cat && cat.type === 'time') {
                     mainValStr = window.formatTime(val);
                 }
@@ -831,10 +942,12 @@
                     subCategory: subCatVal,
                     val: val,
                     durationMin: durationMin,
+                    isPrivateDiary: isPrivateDiary,
+                    weightDetails: weightDetails,
                     valDisp: subCatVal ? `[${subCatVal}] ${mainValStr}` : mainValStr,
                     date: date,
                     time: time,
-                    comment: memo,
+                    comment: isPrivateDiary ? '' : memo,
                     photo: window.currentRecPhotoData,
                     userId: window.dbData.user.id,
                     userName: window.dbData.user.name,
@@ -1041,6 +1154,16 @@
 
                 const hasCategory = allMyCats.some(c => c.name === p.catName);
 
+                const wDet = p.weightDetails;
+                const weightDetailHtml = wDet ? `
+                    <div class="mt-2 p-2 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg text-[9px] grid grid-cols-4 gap-1 text-center font-bold text-blue-600 dark:text-blue-300">
+                        ${wDet.bmi ? `<div>BMI: ${wDet.bmi}</div>` : ''}
+                        ${wDet.fat ? `<div>脂肪: ${wDet.fat}%</div>` : ''}
+                        ${wDet.muscle ? `<div>筋肉: ${wDet.muscle}kg</div>` : ''}
+                        ${wDet.bone ? `<div>骨量: ${wDet.bone}kg</div>` : ''}
+                    </div>
+                ` : '';
+
                 return `
                 <div class="glass-card p-4 text-left shadow-sm relative">
                     <div class="flex items-center justify-between mb-3 pb-2 border-b border-black/5 dark:border-white/5">
@@ -1063,6 +1186,7 @@
                     </div>
 
                     <p class="todo-title">${p.valDisp}</p>
+                    ${weightDetailHtml}
                     ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
                     ${p.photo ? `<img src="${p.photo}" onclick="window.openImageModal('${p.photo}')" class="w-24 h-24 rounded-xl object-cover mt-2 cursor-pointer border border-black/10 hover:opacity-90 transition">` : ''}
                     <p class="text-[8px] text-gray-400 mt-2">${p.date || ''} ${p.time || ''}</p>
@@ -1339,7 +1463,7 @@
                         <div class="flex items-start gap-2 text-xs bg-black/5 dark:bg-white/5 p-3 rounded-xl">
                             <span class="text-blue-500 font-black">•</span>
                             <div class="flex-1">
-                                <p class="font-bold text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${r.comment || '（文章なし）'}</p>
+                                <p class="font-bold text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${r.isPrivateDiary ? '🔒 内容非公開' : (r.comment || '（文章なし）')}</p>
                                 <p class="text-[8px] text-gray-400 mt-1">${r.time || ''}</p>
                             </div>
                         </div>
@@ -1419,9 +1543,7 @@
             if (!file) return;
             const r = new FileReader();
             r.onload = (ev) => {
-                window.tempSelectedAvatar = ev.target.result;
-                const prev = document.getElementById('set-avatar-preview');
-                if (prev) prev.src = window.tempSelectedAvatar;
+                window.openCropModal(ev.target.result, 'avatar');
             };
             r.readAsDataURL(file);
         };
@@ -1488,6 +1610,7 @@
             }
         };
 
+        // 🌟 体重ランキングの「増減量（減量幅）」ランキング化
         window.updateRankList = async function(id) {
             const u = window.dbData.user;
             window.rankCatId = id;
@@ -1500,8 +1623,8 @@
             if (usersList.length === 0) {
                 usersList = [
                     { user: { id: u.id, name: u.name + " (あなた)", avatar: u.avatar, groups: u.groups }, records: window.dbData.records, cats: window.dbData.cats },
-                    { user: { id: 'mock_1', name: 'タロウ', avatar: 'https://ui-avatars.com/api/?name=Taro', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 3.5 }, { catId: 'custom_piano', catName: 'ピアノ', val: 2.0 }, { catId: 'weight', val: 62 }] },
-                    { user: { id: 'mock_2', name: 'ハナコ', avatar: 'https://ui-avatars.com/api/?name=Hanako', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 5.0 }, { catId: 'custom_piano', catName: 'ピアノ', val: 4.5 }, { catId: 'weight', val: 48 }] }
+                    { user: { id: 'mock_1', name: 'タロウ', avatar: 'https://ui-avatars.com/api/?name=Taro', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 3.5 }, { catId: 'weight', date: '2026-07-29', val: 65.0 }, { catId: 'weight', date: '2026-07-30', val: 63.8 }] },
+                    { user: { id: 'mock_2', name: 'ハナコ', avatar: 'https://ui-avatars.com/api/?name=Hanako', groups: [{ code: 'ABC123', name: '勉強グループ' }] }, records: [{ catId: 'study', val: 5.0 }, { catId: 'weight', date: '2026-07-29', val: 50.0 }, { catId: 'weight', date: '2026-07-30', val: 50.5 }] }
                 ];
             } else {
                 const myIndex = usersList.findIndex(x => x.user?.id === u.id);
@@ -1544,7 +1667,7 @@
             const filters = document.getElementById('rank-filters');
             if (filters) {
                 filters.innerHTML = availableCats.filter(c => c.type !== 'todo').map(c => `
-                    <button onclick="window.updateRankList('${c.id}')" class="chip ${window.rankCatId === c.id ? 'active' : ''}">${c.name}</button>
+                    <button onclick="window.updateRankList('${c.id}')" class="chip ${window.rankCatId === c.id ? 'active' : ''}">${c.name}${c.id === 'weight' ? ' (増減量)' : ''}</button>
                 `).join('');
             }
 
@@ -1555,17 +1678,27 @@
                 usersList = usersList.filter(uData => (uData.user?.groups || []).some(g => g.code === window.currentRankScope));
             }
 
-            const rankedUsers = usersList.map(uData => {
-                const recs = uData.records || [];
-                let val = 0;
-                if (selectedCat.id === 'weight') {
-                    const wRecs = recs.filter(r => r.catId === 'weight');
-                    val = wRecs.length > 0 ? wRecs[0].val : (uData.user?.weight || 60);
-                } else {
-                    val = recs.filter(r => r.catId === selectedCat.id || r.catName === selectedCat.name).reduce((s, a) => s + (a.val || 0), 0);
-                }
-                return { user: uData.user || { name: '匿名' }, val: val };
-            }).sort((a, b) => b.val - a.val);
+            let rankedUsers = [];
+
+            if (selectedCat.id === 'weight') {
+                // 🌟 体重ランキング：前日/前回の記録からの「増減量」でランク付け！(減った人が1位)
+                rankedUsers = usersList.map(uData => {
+                    const recs = (uData.records || []).filter(r => r.catId === 'weight').sort((a, b) => new Date(`${b.date}T${b.time || '00:00'}`) - new Date(`${a.date}T${a.time || '00:00'}`));
+                    let diff = 0;
+                    if (recs.length >= 2) {
+                        diff = recs[0].val - recs[1].val; // 最新 - 前回
+                    } else if (recs.length === 1) {
+                        diff = 0;
+                    }
+                    return { user: uData.user || { name: '匿名' }, val: diff, isWeightDiff: true };
+                }).sort((a, b) => a.val - b.val); // マイナスが大きい人（減量成功）が上位1位！
+            } else {
+                rankedUsers = usersList.map(uData => {
+                    const recs = uData.records || [];
+                    const val = recs.filter(r => r.catId === selectedCat.id || r.catName === selectedCat.name).reduce((s, a) => s + (a.val || 0), 0);
+                    return { user: uData.user || { name: '匿名' }, val: val, isWeightDiff: false };
+                }).sort((a, b) => b.val - a.val);
+            }
 
             const display = document.getElementById('ranking-display');
             if (display) {
@@ -1579,11 +1712,16 @@
                         if (rankNum === 2) rankBadge = `<span class="w-6 text-lg text-center">🥈</span>`;
                         if (rankNum === 3) rankBadge = `<span class="w-6 text-lg text-center">🥉</span>`;
 
-                        let valFormatted = `${item.val.toFixed(1)} ${unitStr}`;
-                        if (selectedCat && (selectedCat.type === 'time' || selectedCat.type === 'sleep')) {
-                            valFormatted = window.formatTime(item.val);
-                        } else if (selectedCat && selectedCat.type === 'diary') {
-                            valFormatted = `${item.val} 文字`;
+                        let valFormatted = '';
+                        if (item.isWeightDiff) {
+                            valFormatted = item.val < 0 ? `<span class="diff-minus">${item.val.toFixed(1)} kg</span>` : item.val > 0 ? `<span class="diff-plus">+${item.val.toFixed(1)} kg</span>` : `±0.0 kg`;
+                        } else {
+                            valFormatted = `${item.val.toFixed(1)} ${unitStr}`;
+                            if (selectedCat && (selectedCat.type === 'time' || selectedCat.type === 'sleep')) {
+                                valFormatted = window.formatTime(item.val);
+                            } else if (selectedCat && selectedCat.type === 'diary') {
+                                valFormatted = `${item.val} 文字`;
+                            }
                         }
 
                         const isMe = item.user.id === u.id;
@@ -1688,4 +1826,3 @@
     </script>
 </body>
 </html>
-```
