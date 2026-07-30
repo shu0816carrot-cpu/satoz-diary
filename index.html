@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.14</title>
+    <title>Satoz Diary Ver. α.15</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -37,7 +37,7 @@
         .todo-checked { opacity: 0.4; text-decoration: line-through; }
         .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
         .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
-        .val-input { font-size: 14px; width: 60px; text-align: center; border-bottom: 1px solid var(--apple-accent); }
+        .dial-select { font-size: 14px; font-weight: bold; padding: 8px 12px; text-align: center; background: rgba(120,120,120,0.15); border-radius: 12px; }
     </style>
 
     <script>
@@ -81,11 +81,27 @@
         })();
     </script>
 
+    <!-- 通知一覧モーダル -->
+    <div id="notify-modal" class="fixed inset-0 z-[26000] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-card modal-pop p-5 max-w-sm w-full shadow-2xl relative max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-black/10 dark:border-white/10">
+                <h3 class="font-bold text-sm text-blue-600 flex items-center gap-1.5">
+                    <i class="bi bi-bell-fill"></i>
+                    <span>通知一覧</span>
+                </h3>
+                <button onclick="window.closeNotifyModal()" class="text-xs font-bold text-gray-400">閉じる</button>
+            </div>
+            <div id="notify-list" class="space-y-2 overflow-y-auto flex-1 text-xs">
+                <p class="text-center text-gray-400 py-6">通知はありません</p>
+            </div>
+        </div>
+    </div>
+
     <!-- 写真トリミング（切り取り）編集モーダル -->
     <div id="crop-modal" class="fixed inset-0 z-[25000] bg-black/90 backdrop-blur-md hidden flex flex-col items-center justify-center p-4">
         <div class="max-w-md w-full bg-gray-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div class="p-4 bg-gray-800 text-white flex justify-between items-center">
-                <h3 class="font-bold text-sm">✂️ 写真の切り取り・編集</h3>
+                <h3 class="font-bold text-sm">写真の切り取り・編集</h3>
                 <button onclick="window.cancelCrop()" class="text-xs text-gray-400 font-bold">キャンセル</button>
             </div>
             <div class="p-4 flex-1 flex items-center justify-center overflow-hidden bg-black max-h-[60vh]">
@@ -127,7 +143,7 @@
                 <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="window.handleRecPhotoSelect(event)">
                 <button type="button" onclick="document.getElementById('rec-photo-input').click()" class="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-xl flex items-center gap-1.5">
                     <i class="bi bi-crop"></i>
-                    <span>📷 写真を追加（トリミング編集）</span>
+                    <span>写真を追加 (トリミング編集)</span>
                 </button>
                 <div id="rec-photo-preview-box" class="hidden relative mt-2 w-20 h-20">
                     <img id="rec-photo-preview-img" class="w-20 h-20 rounded-xl object-cover border-2 border-blue-500/30">
@@ -153,7 +169,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.14</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.15</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -166,7 +182,7 @@
             </div>
 
             <button onclick="window.demoLogin()" class="w-full bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 text-gray-700 dark:text-gray-200 font-bold py-3 px-6 rounded-2xl text-xs transition">
-                👨‍💻 ゲストとして試す (デモモード)
+                ゲストとして試す (デモモード)
             </button>
 
             <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active</p>
@@ -178,9 +194,15 @@
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
                 <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.14</span>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.15</span>
             </div>
             <div class="flex items-center gap-2">
+                <!-- 通知ボタン -->
+                <button onclick="window.toggleNotifyModal()" class="relative w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="通知">
+                    <i class="bi bi-bell-fill"></i>
+                    <span id="notify-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow">0</span>
+                </button>
+
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
                 <button onclick="window.showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
                     <i class="bi bi-gear-fill text-sm"></i>
@@ -196,7 +218,7 @@
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="font-bold text-xs text-gray-500 uppercase tracking-wider">スケジュール・予定</h2>
                         <div class="flex gap-1.5">
-                            <button onclick="window.toggleTodoEditMode()" id="todo-edit-btn" class="text-[10px] bg-black/10 dark:bg-white/10 text-gray-700 dark:text-gray-200 px-2.5 py-1 rounded-full font-bold">✏️ 編集</button>
+                            <button onclick="window.toggleTodoEditMode()" id="todo-edit-btn" class="text-[10px] bg-black/10 dark:bg-white/10 text-gray-700 dark:text-gray-200 px-2.5 py-1 rounded-full font-bold">編集</button>
                             <button onclick="window.openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-2.5 py-1 rounded-full font-bold">予定追加</button>
                         </div>
                     </div>
@@ -433,7 +455,8 @@
             user: Object.assign({ name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, birthdate: "2004-01-01", avatar: null, groups: [] }, localDb.user || {}),
             records: Array.isArray(localDb.records) ? localDb.records : [],
             todos: Array.isArray(localDb.todos) ? localDb.todos : [],
-            cats: Array.isArray(localDb.cats) ? localDb.cats : []
+            cats: Array.isArray(localDb.cats) ? localDb.cats : [],
+            notifications: Array.isArray(localDb.notifications) ? localDb.notifications : []
         };
         window.dbData.user.groups = window.dbData.user.groups || [];
 
@@ -446,9 +469,8 @@
         window.isTodoEditMode = false;
         window.tempSelectedAvatar = null;
 
-        // トリミング管理
         window.cropper = null;
-        window.currentCropTarget = null; // 'rec' or 'avatar'
+        window.currentCropTarget = null;
 
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
@@ -489,16 +511,22 @@
             if (ageInput) ageInput.value = age;
         };
 
-        // 🌟 画像クロップ（トリミング）モーダル起動＆リサイズ圧縮
+        // ドラムロール（セレクト）生成ヘルパー
+        window.buildOptions = function(min, max, step = 1, pad = false) {
+            let html = '';
+            for (let i = min; i <= max; i += step) {
+                const valStr = pad ? String(i).padStart(2, '0') : String(i);
+                html += `<option value="${i}">${valStr}</option>`;
+            }
+            return html;
+        };
+
         window.openCropModal = function(imageSrc, targetType) {
             window.currentCropTarget = targetType;
             const targetImg = document.getElementById('crop-target-img');
             targetImg.src = imageSrc;
-
             document.getElementById('crop-modal').classList.remove('hidden');
-
             if (window.cropper) window.cropper.destroy();
-
             window.cropper = new Cropper(targetImg, {
                 aspectRatio: targetType === 'avatar' ? 1 : NaN,
                 viewMode: 1,
@@ -518,13 +546,9 @@
         window.applyCrop = function() {
             if (!window.cropper) return;
             const canvas = window.cropper.getCroppedCanvas({
-                maxWidth: 600,
-                maxHeight: 600,
-                imageSmoothingEnabled: true,
-                imageSmoothingQuality: 'high',
+                maxWidth: 600, maxHeight: 600,
+                imageSmoothingEnabled: true, imageSmoothingQuality: 'high',
             });
-
-            // 高圧縮JPEGでデータ容量を極小化 (超軽量化)
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
 
             if (window.currentCropTarget === 'rec') {
@@ -536,8 +560,60 @@
                 const prev = document.getElementById('set-avatar-preview');
                 if (prev) prev.src = compressedBase64;
             }
-
             window.cancelCrop();
+        };
+
+        // 通知機能
+        window.toggleNotifyModal = function() {
+            const modal = document.getElementById('notify-modal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                window.renderNotifyList();
+                // 開いたら未読件数をクリア
+                (window.dbData.notifications || []).forEach(n => n.read = true);
+                window.saveLocal();
+                window.updateNotifyBadge();
+            } else {
+                modal.classList.add('hidden');
+            }
+        };
+
+        window.closeNotifyModal = function() {
+            document.getElementById('notify-modal').classList.add('hidden');
+        };
+
+        window.updateNotifyBadge = function() {
+            const notifs = window.dbData.notifications || [];
+            const unread = notifs.filter(n => !n.read).length;
+            const badge = document.getElementById('notify-badge');
+            if (badge) {
+                if (unread > 0) {
+                    badge.innerText = unread;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        };
+
+        window.renderNotifyList = function() {
+            const list = document.getElementById('notify-list');
+            const notifs = window.dbData.notifications || [];
+            if (!list) return;
+            if (notifs.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400 py-6">通知はありません</p>`;
+                return;
+            }
+            list.innerHTML = notifs.map(n => `
+                <div class="p-3 bg-black/5 dark:bg-white/5 rounded-xl space-y-1">
+                    <div class="flex justify-between items-center font-bold text-[10px]">
+                        <span class="text-blue-500">${n.fromName} さんからのコメント</span>
+                        <span class="text-gray-400 font-normal">${new Date(n.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    <p class="font-bold text-gray-800 dark:text-gray-200">${n.text}</p>
+                    <p class="text-[9px] text-gray-400 truncate">対象記録: ${n.postVal || '記録'}</p>
+                </div>
+            `).join('');
         };
 
         window.cloud = {
@@ -546,26 +622,16 @@
                     alert("Firebaseが読み込めません。デモモードをご利用ください。");
                     return window.demoLogin();
                 }
-
                 const statusBox = document.getElementById('login-status-msg');
                 const statusText = document.getElementById('login-status-text');
                 const loginBtn = document.getElementById('google-login-btn');
-
                 if (statusBox) statusBox.classList.remove('hidden');
                 if (statusText) statusText.innerText = "Googleログイン処理中... (画面が開かない場合は下記参照)";
-                if (loginBtn) {
-                    loginBtn.disabled = true;
-                    loginBtn.classList.add('opacity-50');
-                }
+                if (loginBtn) { loginBtn.disabled = true; loginBtn.classList.add('opacity-50'); }
 
                 const timeoutTimer = setTimeout(() => {
-                    if (statusText) {
-                        statusText.innerText = "⚠️ 応答がありません。Firebaseコンソールに「承認済みドメイン」が追加されているか、ブラウザのポップアップブロックをご確認ください。";
-                    }
-                    if (loginBtn) {
-                        loginBtn.disabled = false;
-                        loginBtn.classList.remove('opacity-50');
-                    }
+                    if (statusText) statusText.innerText = "⚠️ 応答がありません。Firebaseコンソールに「承認済みドメイン」が追加されているか、ブラウザのポップアップブロックをご確認ください。";
+                    if (loginBtn) { loginBtn.disabled = false; loginBtn.classList.remove('opacity-50'); }
                 }, 8000);
 
                 try {
@@ -574,12 +640,9 @@
                 } catch (error) {
                     clearTimeout(timeoutTimer);
                     window.resetLoginStatus();
-                    console.error("Firebase Login Error:", error);
                     if (error.code === 'auth/unauthorized-domain') {
-                        alert("【エラー: 承認未追加ドメイン】\nFirebaseコンソールの Authentication > Settings > Authorized domains に、現在ご利用中のGitHubのURL（例: username.github.io）を追加してください。");
-                    } else if (error.code === 'auth/popup-closed-by-user') {
-                        // キャンセル
-                    } else {
+                        alert("【エラー: 承認未追加ドメイン】\nFirebaseコンソールの Authentication > Settings > Authorized domains に、現在ご利用中のGitHubのURLを追加してください。");
+                    } else if (error.code !== 'auth/popup-closed-by-user') {
                         alert("Googleログインエラー:\n" + error.message);
                     }
                 }
@@ -626,10 +689,24 @@
                     }
                 }
             },
-            addComment: async (docId, commentObj) => {
+            addComment: async (docId, commentObj, postOwnerId, postVal) => {
                 if (window.isDemoMode || !db) return alert("デモモードのためコメントはオンライン保存されません。");
                 const ref = doc(db, "timeline", docId);
                 await updateDoc(ref, { comments: arrayUnion(commentObj) });
+
+                // 投稿者に通知を送信
+                if (postOwnerId && postOwnerId !== commentObj.userId) {
+                    try {
+                        const userRef = doc(db, "users", postOwnerId);
+                        const uSnap = await getDoc(userRef);
+                        if (uSnap.exists()) {
+                            const uData = uSnap.data();
+                            const notifs = uData.notifications || [];
+                            notifs.unshift({ id: Date.now(), fromName: commentObj.userName, text: commentObj.text, postVal: postVal || '記録', createdAt: Date.now(), read: false });
+                            await updateDoc(userRef, { notifications: notifs });
+                        }
+                    } catch(e) { console.error(e); }
+                }
             },
             deleteTimelinePost: async (docId) => {
                 if (window.isDemoMode || !db) return;
@@ -693,6 +770,7 @@
             window.renderCategories();
             window.renderAll();
             window.renderResultsView();
+            window.updateNotifyBadge();
             
             const savedTab = localStorage.getItem('sz_active_tab') || 'home';
             window.showSection(savedTab);
@@ -748,6 +826,7 @@
             document.getElementById('image-modal').classList.add('hidden');
         };
 
+        // 🌟 ダイヤル式（セレクト）数値入力フィールド構築
         window.openInput = function(id) {
             window.currentCatId = id;
             window.clearRecPhoto();
@@ -777,19 +856,26 @@
                     <input type="text" id="v_task_todo" placeholder="予定内容 (例: 買い物)" class="w-full mb-3 text-xs">
                     <div class="flex items-center gap-2 p-2 bg-black/5 dark:bg-white/5 rounded-xl">
                         <input type="checkbox" id="todo-has-time" onchange="document.getElementById('todo-time-box').classList.toggle('hidden', !this.checked)">
-                        <label for="todo-has-time" class="text-xs font-bold">⏰ 時間を指定する</label>
+                        <label for="todo-has-time" class="text-xs font-bold">時間を指定する</label>
                     </div>
                     <div id="todo-time-box" class="hidden mt-2">
                         <input type="time" id="todo-exact-time" class="w-full text-xs" value="12:00">
                     </div>
                 `;
             } else if (id === 'weight') {
+                // 🌟 体重：0〜999kg (整数＋小数ダイヤル式)
                 fields.innerHTML += `
-                    <input type="number" id="v1" step="0.1" placeholder="体重 (kg) を入力" class="w-full text-xs font-bold">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase">体重 (0 ～ 999 kg)</label>
+                    <div class="flex gap-2 items-center justify-center">
+                        <select id="v_weight_int" class="dial-select flex-1">${window.buildOptions(0, 999)}</select>
+                        <span class="font-bold text-lg">.</span>
+                        <select id="v_weight_dec" class="dial-select w-20">${window.buildOptions(0, 9)}</select>
+                        <span class="font-bold text-xs text-gray-500">kg</span>
+                    </div>
                     <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl space-y-2 border border-blue-200">
                         <div class="flex items-center gap-2">
                             <input type="checkbox" id="weight-detail-check" onchange="document.getElementById('weight-detail-fields').classList.toggle('hidden', !this.checked)">
-                            <label for="weight-detail-check" class="text-xs font-bold text-blue-600 dark:text-blue-300">🩺 詳細を記入する (任意)</label>
+                            <label for="weight-detail-check" class="text-xs font-bold text-blue-600 dark:text-blue-300">詳細を記入する (任意)</label>
                         </div>
                         <div id="weight-detail-fields" class="hidden grid grid-cols-2 gap-2 pt-1 text-[10px]">
                             <div>BMI<input type="number" step="0.1" id="w_bmi" placeholder="例: 22.5" class="w-full mt-1 text-xs"></div>
@@ -799,26 +885,46 @@
                         </div>
                     </div>
                 `;
+                // 初期選択を65.0に合わせる
+                setTimeout(() => {
+                    const intSel = document.getElementById('v_weight_int');
+                    if (intSel) intSel.value = Math.floor(window.dbData.user.weight || 65);
+                }, 50);
             } else if (id === 'run') {
-                fields.innerHTML += `<input type="number" id="v_dist" placeholder="走った距離(km)" class="w-full mb-2 text-xs" oninput="window.updatePreCal()">
+                // 🌟 距離：0〜999km ＆ 時間H:0〜23, M:0〜59
+                fields.innerHTML += `
+                    <label class="text-[10px] font-bold text-gray-400 uppercase">距離 (0 ～ 999 km)</label>
+                    <div class="flex gap-2 items-center justify-center mb-3">
+                        <select id="v_dist_int" class="dial-select flex-1" onchange="window.updatePreCal()">${window.buildOptions(0, 999)}</select>
+                        <span class="font-bold text-lg">.</span>
+                        <select id="v_dist_dec" class="dial-select w-20" onchange="window.updatePreCal()">${window.buildOptions(0, 9)}</select>
+                        <span class="font-bold text-xs text-gray-500">km</span>
+                    </div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase">走った時間 (0〜23h / 0〜59m)</label>
                     <div class="flex gap-2 justify-center items-center">
-                        <input type="number" id="v_hrs" placeholder="時" class="val-input" oninput="window.updatePreCal()"><span>h</span>
-                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="window.updatePreCal()"><span>m</span>
-                    </div>`;
+                        <select id="v_hrs" class="dial-select flex-1" onchange="window.updatePreCal()">${window.buildOptions(0, 23)}</select>
+                        <span class="font-bold text-xs">h</span>
+                        <select id="v_mins" class="dial-select flex-1" onchange="window.updatePreCal()">${window.buildOptions(0, 59, 1, true)}</select>
+                        <span class="font-bold text-xs">m</span>
+                    </div>
+                `;
                 window.updatePreCal();
             } else if (id === 'diary') {
                 fields.innerHTML += `
-                    <p class="text-xs text-blue-500 font-bold bg-blue-50 dark:bg-blue-900/30 p-2.5 rounded-xl">✍️ 下の枠に日記の文章を入力してください（文字数は自動カウントされます）</p>
+                    <p class="text-xs text-gray-500 font-normal bg-black/5 dark:bg-white/5 p-2.5 rounded-xl">下の枠に日記の文章を入力してください（文字数は自動カウントされます）</p>
                     <div class="flex items-center gap-2 p-2 bg-black/5 dark:bg-white/5 rounded-xl">
                         <input type="checkbox" id="diary-private-check">
-                        <label for="diary-private-check" class="text-xs font-bold text-gray-700 dark:text-gray-200">🔒 日記の内容を非表示にする (文字数のみ公開)</label>
+                        <label for="diary-private-check" class="text-xs font-bold text-gray-700 dark:text-gray-200">日記の内容を非表示にする (文字数のみ公開)</label>
                     </div>
                 `;
             } else if (cat && (cat.type === 'time' || cat.id === 'exercise')) {
                 fields.innerHTML += `
+                    <label class="text-[10px] font-bold text-gray-400 uppercase">時間 (0〜23h / 0〜59m)</label>
                     <div class="flex gap-2 justify-center items-center">
-                        <input type="number" id="v_hrs" placeholder="時" class="val-input" oninput="window.updatePreCal()"><span>h</span>
-                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="window.updatePreCal()"><span>m</span>
+                        <select id="v_hrs" class="dial-select flex-1" onchange="window.updatePreCal()">${window.buildOptions(0, 23)}</select>
+                        <span class="font-bold text-xs">h</span>
+                        <select id="v_mins" class="dial-select flex-1" onchange="window.updatePreCal()">${window.buildOptions(0, 59, 1, true)}</select>
+                        <span class="font-bold text-xs">m</span>
                     </div>`;
                 window.updatePreCal();
             } else if (id === 'sleep') {
@@ -843,7 +949,7 @@
             document.getElementById('input-modal').classList.add('hidden');
         };
 
-        // 🌟 日付＋時刻による厳密な最新日時判定
+        // 🌟 記録の保存処理
         window.saveRecord = async function() {
             const memo = document.getElementById('rec-comment').value.trim();
             const date = document.getElementById('rec-date').value;
@@ -871,27 +977,11 @@
                 const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate() + 1)).toISOString().split('T')[0];
                 window.dbData.todos.push({ id: Date.now(), time: exactTime, task, memo, done: false, date: targetDate, photo: window.currentRecPhotoData });
             } else {
-                if (window.currentCatId === 'run') {
-                    val = parseFloat(document.getElementById('v_dist')?.value || 0);
-                    const hrs = parseFloat(document.getElementById('v_hrs')?.value || 0);
-                    const mins = parseFloat(document.getElementById('v_mins')?.value || 0);
-                    durationMin = Math.round(hrs * 60 + mins);
-                } else if (window.currentCatId === 'diary') {
-                    val = memo.length;
-                    isPrivateDiary = document.getElementById('diary-private-check')?.checked || false;
-                } else if (cat && cat.type === 'time') {
-                    val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
-                    durationMin = Math.round(val * 60);
-                } else if (window.currentCatId === 'sleep') {
-                    const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
-                    const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
-                    val = (e - s) / 3600000; if (val < 0) val += 24;
-                    durationMin = Math.round(val * 60);
-                } else {
-                    val = parseFloat(document.getElementById('v1')?.value || 0);
-                }
-
                 if (window.currentCatId === 'weight') {
+                    const wInt = parseFloat(document.getElementById('v_weight_int')?.value || 0);
+                    const wDec = parseFloat(document.getElementById('v_weight_dec')?.value || 0);
+                    val = wInt + (wDec / 10);
+
                     const hasDetail = document.getElementById('weight-detail-check')?.checked;
                     if (hasDetail) {
                         weightDetails = {
@@ -918,13 +1008,33 @@
                     }
 
                     window.dbData.records = window.dbData.records.filter(r => !(r.date === date && r.time === time && r.catId === 'weight'));
+                } else if (window.currentCatId === 'run') {
+                    const dInt = parseFloat(document.getElementById('v_dist_int')?.value || 0);
+                    const dDec = parseFloat(document.getElementById('v_dist_dec')?.value || 0);
+                    val = dInt + (dDec / 10);
+                    const hrs = parseFloat(document.getElementById('v_hrs')?.value || 0);
+                    const mins = parseFloat(document.getElementById('v_mins')?.value || 0);
+                    durationMin = Math.round(hrs * 60 + mins);
+                } else if (window.currentCatId === 'diary') {
+                    val = memo.length;
+                    isPrivateDiary = document.getElementById('diary-private-check')?.checked || false;
+                } else if (cat && cat.type === 'time') {
+                    val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
+                    durationMin = Math.round(val * 60);
+                } else if (window.currentCatId === 'sleep') {
+                    const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
+                    const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
+                    val = (e - s) / 3600000; if (val < 0) val += 24;
+                    durationMin = Math.round(val * 60);
+                } else {
+                    val = parseFloat(document.getElementById('v1')?.value || 0);
                 }
 
                 let mainValStr = `${val.toFixed(1)} ${cat ? cat.unit : ''}`;
                 if (window.currentCatId === 'run') {
                     mainValStr = `${val.toFixed(1)} km (${window.formatTimeShort(durationMin)})`;
                 } else if (window.currentCatId === 'diary') {
-                    mainValStr = isPrivateDiary ? `🔒 内容非公開 (${val}文字)` : `${val} 文字`;
+                    mainValStr = isPrivateDiary ? `内容非公開 (${val}文字)` : `${val} 文字`;
                 } else if (cat && cat.type === 'time') {
                     mainValStr = window.formatTime(val);
                 }
@@ -947,7 +1057,7 @@
                     valDisp: subCatVal ? `[${subCatVal}] ${mainValStr}` : mainValStr,
                     date: date,
                     time: time,
-                    comment: isPrivateDiary ? '' : memo,
+                    comment: memo,
                     photo: window.currentRecPhotoData,
                     userId: window.dbData.user.id,
                     userName: window.dbData.user.name,
@@ -981,7 +1091,7 @@
             window.isTodoEditMode = !window.isTodoEditMode;
             const btn = document.getElementById('todo-edit-btn');
             if (btn) {
-                btn.innerText = window.isTodoEditMode ? "✓ 完了" : "✏️ 編集";
+                btn.innerText = window.isTodoEditMode ? "完了" : "編集";
                 btn.classList.toggle('bg-blue-600', window.isTodoEditMode);
                 btn.classList.toggle('text-white', window.isTodoEditMode);
             }
@@ -1034,7 +1144,7 @@
                             ${window.isTodoEditMode ? `
                                 <button onclick="window.moveTodo(${t.id}, -1)" class="px-1.5 py-0.5 bg-black/10 rounded text-[10px]">▲</button>
                                 <button onclick="window.moveTodo(${t.id}, 1)" class="px-1.5 py-0.5 bg-black/10 rounded text-[10px]">▼</button>
-                                <button onclick="window.deleteTodo(${t.id})" class="px-1.5 py-0.5 bg-red-500 text-white rounded text-[10px] font-bold">🗑️</button>
+                                <button onclick="window.deleteTodo(${t.id})" class="px-1.5 py-0.5 bg-red-500 text-white rounded text-[10px] font-bold">削除</button>
                             ` : ''}
                         </div>
                     </div>
@@ -1164,6 +1274,9 @@
                     </div>
                 ` : '';
 
+                // 日記で非公開の場合は本文をマスク
+                const displayComment = p.isPrivateDiary ? '<span class="text-gray-400 font-italic text-[10px]">🔒 内容非公開</span>' : (p.comment || '');
+
                 return `
                 <div class="glass-card p-4 text-left shadow-sm relative">
                     <div class="flex items-center justify-between mb-3 pb-2 border-b border-black/5 dark:border-white/5">
@@ -1181,13 +1294,13 @@
                         </div>
 
                         <div>
-                            ${isMyPost && p.docId ? `<button onclick="window.handleDeletePost('${p.docId}')" class="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md hover:bg-red-100 transition">🗑️ 削除</button>` : ''}
+                            ${isMyPost && p.docId ? `<button onclick="window.handleDeletePost('${p.docId}')" class="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md hover:bg-red-100 transition">削除</button>` : ''}
                         </div>
                     </div>
 
                     <p class="todo-title">${p.valDisp}</p>
                     ${weightDetailHtml}
-                    ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
+                    ${p.comment || p.isPrivateDiary ? `<p class="text-[11px] opacity-80 mt-1">${displayComment}</p>` : ''}
                     ${p.photo ? `<img src="${p.photo}" onclick="window.openImageModal('${p.photo}')" class="w-24 h-24 rounded-xl object-cover mt-2 cursor-pointer border border-black/10 hover:opacity-90 transition">` : ''}
                     <p class="text-[8px] text-gray-400 mt-2">${p.date || ''} ${p.time || ''}</p>
 
@@ -1213,7 +1326,7 @@
                         </div>
                         <div class="flex gap-2 mt-2">
                             <input type="text" id="comment-input-${p.docId}" placeholder="コメントを書く..." class="flex-1 text-xs p-2">
-                            <button onclick="window.handleAddComment('${p.docId}')" class="bg-blue-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl">送信</button>
+                            <button onclick="window.handleAddComment('${p.docId}', '${p.userId}', '${p.valDisp}')" class="bg-blue-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl">送信</button>
                         </div>
                     </div>
                 </div>
@@ -1253,7 +1366,7 @@
             if (box) box.classList.toggle('hidden');
         };
 
-        window.handleAddComment = async function(docId) {
+        window.handleAddComment = async function(docId, postOwnerId, postVal) {
             const input = document.getElementById(`comment-input-${docId}`);
             if (!input || !input.value.trim()) return;
 
@@ -1264,7 +1377,7 @@
                 createdAt: Date.now()
             };
 
-            await window.cloud.addComment(docId, commentObj);
+            await window.cloud.addComment(docId, commentObj, postOwnerId, postVal);
             input.value = '';
         };
 
@@ -1370,6 +1483,7 @@
             alert(`グループ「${groupName}」から脱退しました。`);
         };
 
+        // 🌟 Results（結果タブ）では自分の日記内容がそのまま表示される！
         window.renderResultsView = function() {
             const date = document.getElementById('results-date').value;
             const all = [...baseCats, ...(window.dbData.cats || [])];
@@ -1463,8 +1577,8 @@
                         <div class="flex items-start gap-2 text-xs bg-black/5 dark:bg-white/5 p-3 rounded-xl">
                             <span class="text-blue-500 font-black">•</span>
                             <div class="flex-1">
-                                <p class="font-bold text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${r.isPrivateDiary ? '🔒 内容非公開' : (r.comment || '（文章なし）')}</p>
-                                <p class="text-[8px] text-gray-400 mt-1">${r.time || ''}</p>
+                                <p class="font-bold text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${r.comment || '（文章なし）'}</p>
+                                <p class="text-[8px] text-gray-400 mt-1">${r.time || ''} ${r.isPrivateDiary ? '(TL上では非公開設定)' : ''}</p>
                             </div>
                         </div>
                     `).join('');
@@ -1495,7 +1609,10 @@
 
             let mets = 0;
             if (window.currentCatId === 'run') {
-                const dist = parseFloat(document.getElementById('v_dist')?.value || 0);
+                const dInt = parseFloat(document.getElementById('v_dist_int')?.value || 0);
+                const dDec = parseFloat(document.getElementById('v_dist_dec')?.value || 0);
+                const dist = dInt + (dDec / 10);
+
                 if (totalHours > 0 && dist > 0) {
                     const speed = dist / totalHours;
                     if (speed < 6) mets = 5.0;
@@ -1601,7 +1718,7 @@
                                 <span class="font-bold text-gray-800 dark:text-gray-200">${g.name}</span>
                                 <span class="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 font-mono text-[10px] px-2 py-0.5 rounded-full ml-1 font-bold">${g.code}</span>
                             </div>
-                            <button onclick="window.handleLeaveGroup('${g.code}')" class="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded-lg hover:bg-red-100 transition">🚪 脱退</button>
+                            <button onclick="window.handleLeaveGroup('${g.code}')" class="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded-lg hover:bg-red-100 transition">脱退</button>
                         </div>
                     `).join('');
                 } else {
@@ -1610,7 +1727,6 @@
             }
         };
 
-        // 🌟 体重ランキングの「増減量（減量幅）」ランキング化
         window.updateRankList = async function(id) {
             const u = window.dbData.user;
             window.rankCatId = id;
@@ -1681,17 +1797,16 @@
             let rankedUsers = [];
 
             if (selectedCat.id === 'weight') {
-                // 🌟 体重ランキング：前日/前回の記録からの「増減量」でランク付け！(減った人が1位)
                 rankedUsers = usersList.map(uData => {
                     const recs = (uData.records || []).filter(r => r.catId === 'weight').sort((a, b) => new Date(`${b.date}T${b.time || '00:00'}`) - new Date(`${a.date}T${a.time || '00:00'}`));
                     let diff = 0;
                     if (recs.length >= 2) {
-                        diff = recs[0].val - recs[1].val; // 最新 - 前回
+                        diff = recs[0].val - recs[1].val;
                     } else if (recs.length === 1) {
                         diff = 0;
                     }
                     return { user: uData.user || { name: '匿名' }, val: diff, isWeightDiff: true };
-                }).sort((a, b) => a.val - b.val); // マイナスが大きい人（減量成功）が上位1位！
+                }).sort((a, b) => a.val - b.val);
             } else {
                 rankedUsers = usersList.map(uData => {
                     const recs = uData.records || [];
@@ -1804,6 +1919,7 @@
                         if (cloudData) {
                             window.dbData = { ...window.dbData, ...cloudData };
                             window.dbData.user.groups = window.dbData.user.groups || [];
+                            window.dbData.notifications = window.dbData.notifications || [];
                             window.saveLocal();
                             window.initApp();
                         }
