@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. Alpha</title>
+    <title>Satoz Diary Ver. α.-1</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -11,20 +11,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-
-    <!-- 安全装置: モジュール読み込み完了前のエラー防止ダミー -->
-    <script>
-        window.cloud = window.cloud || {
-            login: () => alert("読み込み中です。少々お待ちください。"),
-            logout: () => {},
-            saveAllUserData: async () => {},
-            getUserData: async () => null,
-            postTimeline: async () => {},
-            listenTimeline: () => {},
-            createGroup: async () => {},
-            joinGroup: async () => {}
-        };
-    </script>
 
     <style>
         :root { --apple-bg: #f5f5f7; --apple-card: rgba(255, 255, 255, 0.85); --apple-text: #1d1d1f; --apple-accent: #0071e3; --glass: blur(25px) saturate(180%); }
@@ -51,8 +37,8 @@
 </head>
 <body>
 
-    <!-- 写真全画面表示モーダル -->
-    <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="closeImageModal()">
+    <!-- 写真拡大表示用モーダル -->
+    <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="window.closeImageModal()">
         <img id="image-modal-img" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
         <button class="absolute top-6 right-6 text-white text-3xl font-bold cursor-pointer">×</button>
     </div>
@@ -60,29 +46,28 @@
     <!-- 1. Google ログイン画面 -->
     <div id="login-screen" class="fixed inset-0 z-[10000] bg-white dark:bg-black flex flex-col items-center justify-center text-center p-8">
         <div class="glass-card p-8 max-w-sm w-full shadow-2xl flex flex-col items-center">
-            
-            <!-- アプリアイコン (icon.png) を配置 -->
+            <!-- アプリアイコン (icon.png) -->
             <img src="icon.png" onerror="this.style.display='none'; document.getElementById('icon-fallback').style.display='flex';" class="w-24 h-24 rounded-3xl shadow-lg border-2 border-white/50 object-cover mb-6">
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-8">Ver. Alpha</p>
+            <p class="text-xs font-bold text-blue-500 mb-8">Ver. α.-1</p>
             
             <button onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95">
                 <i class="bi bi-google text-lg"></i>
                 <span>Googleでログイン</span>
             </button>
-            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Ver. Alpha</p>
+            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active</p>
         </div>
     </div>
 
     <!-- 2. アプリ本体 -->
     <div id="app-shell" style="display:none;">
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
-            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="showSection('home')">Satoz Diary <span class="text-xs text-blue-400">α</span></h1>
+            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="window.showSection('home')">Satoz Diary</h1>
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
-                <button onclick="showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
+                <button onclick="window.showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
                     <i class="bi bi-gear-fill text-sm"></i>
                 </button>
             </div>
@@ -95,7 +80,7 @@
                 <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="font-bold text-sm">予定管理 (今日・明日連動)</h2>
-                        <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
+                        <button onclick="window.openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
                     </div>
                     <div id="todo-display-list" class="space-y-4"></div>
                 </div>
@@ -105,7 +90,7 @@
                 <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
                     <div class="flex justify-between items-center mb-4">
                         <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
-                        <div onclick="closeInput()" class="cursor-pointer text-xl font-bold">×</div>
+                        <div onclick="window.closeInput()" class="cursor-pointer text-xl font-bold">×</div>
                     </div>
                     <div class="grid grid-cols-2 gap-2 mb-4 text-[10px] font-bold text-gray-400 uppercase">
                         <div>日付<input type="date" id="rec-date" class="w-full mt-1"></div>
@@ -115,14 +100,14 @@
                     <div id="dynamic-fields" class="space-y-4"></div>
 
                     <div class="mt-4">
-                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="handleRecPhotoSelect(event)">
+                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="window.handleRecPhotoSelect(event)">
                         <button type="button" onclick="document.getElementById('rec-photo-input').click()" class="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-xl flex items-center gap-1.5">
                             <i class="bi bi-camera-fill"></i>
                             <span>📷 写真を追加</span>
                         </button>
                         <div id="rec-photo-preview-box" class="hidden relative mt-2 w-24 h-24">
                             <img id="rec-photo-preview-img" class="w-24 h-24 rounded-xl object-cover border-2 border-blue-500/30">
-                            <button type="button" onclick="clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
+                            <button type="button" onclick="window.clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
                         </div>
                     </div>
 
@@ -133,7 +118,7 @@
                         <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
                     </div>
                     
-                    <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
+                    <button onclick="window.saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
                 </div>
             </section>
 
@@ -150,7 +135,7 @@
             <section id="results" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">Results</h2>
-                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="renderResultsView()">
+                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="window.renderResultsView()">
                 </div>
                 <div id="result-sum-grid" class="grid grid-cols-2 gap-3 mb-6"></div>
                 <div class="glass-card p-4">
@@ -163,7 +148,7 @@
             <section id="ranking" class="view-section">
                 <div class="flex justify-between items-center mb-3">
                     <h2 class="text-xl font-black italic">Rankings</h2>
-                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
+                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="window.updateRankList(window.rankCatId)">
                 </div>
                 
                 <div id="rank-scope-tabs" class="flex gap-2 mb-3"></div>
@@ -182,20 +167,20 @@
                     </h3>
                     <div id="my-group-info" class="text-xs"></div>
                     <div class="grid grid-cols-2 gap-2">
-                        <button onclick="handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
-                        <button onclick="handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
+                        <button onclick="window.handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
+                        <button onclick="window.handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
                     </div>
                 </div>
             </section>
 
-            <!-- Settings (サーバー完全保存) -->
+            <!-- Settings -->
             <section id="settings" class="view-section">
                 <h2 class="text-xl font-bold mb-6 text-center">Settings</h2>
                 <div class="glass-card p-5 space-y-4">
                     <div class="flex flex-col items-center gap-2">
                         <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
                         <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
-                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="handleAvatarFileSelect(event)">
+                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="window.handleAvatarFileSelect(event)">
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-400 uppercase">名前</label>
@@ -219,7 +204,7 @@
                             <input type="number" id="set-age" class="w-full mt-1">
                         </div>
                     </div>
-                    <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">サーバーへ保存・更新</button>
+                    <button onclick="window.saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">設定を保存</button>
                     <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2">ログアウト</button>
                 </div>
             </section>
@@ -227,43 +212,35 @@
 
         <!-- タブバー -->
         <nav class="tab-bar">
-            <button onclick="showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
-            <button onclick="showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
-            <button onclick="showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
-            <button onclick="showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
-            <button onclick="showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
+            <button onclick="window.showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
+            <button onclick="window.showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
+            <button onclick="window.showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
+            <button onclick="window.showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
+            <button onclick="window.showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
         </nav>
     </div>
 
-    <!-- 1. メインアプリケーション標準スクリプト (即時同期実行・安定保証) -->
-    <script>
-        let rawData = {};
-        try { rawData = JSON.parse(localStorage.getItem('sz_v11_db') || '{}'); } catch(e) {}
-        
-        window.dbData = {
-            user: Object.assign({ name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null, groupCode: null, groupName: null }, rawData.user || {}),
-            records: Array.isArray(rawData.records) ? rawData.records : [],
-            todos: Array.isArray(rawData.todos) ? rawData.todos : [],
-            cats: Array.isArray(rawData.cats) ? rawData.cats : []
+    <!-- v15.0 ベース完全統合スクリプト -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC3nZEh7H-3HdUSJ3KfUu1e2HNgYTa6yRs",
+            authDomain: "satoz-diary.firebaseapp.com",
+            projectId: "satoz-diary",
+            storageBucket: "satoz-diary.firebasestorage.app",
+            messagingSenderId: "596323639753",
+            appId: "1:596323639753:web:f4c4a93d1573eb8ab28818"
         };
 
-        window.allPosts = [];
-        let currentTLFilter = 'global';
-        let currentRankScope = 'global';
-        let currentRecPhotoData = null;
-        let currentCatId = '';
-        let rankCatId = 'study';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
 
-        const baseCats = [
-            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
-            { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
-            { 
-                id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0,
-                subOptions: ['国語', '数学', '物理', '化学', '英語', '情報', 'その他'] 
-            },
-            { 
-                id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0,
-                subOptions: ['腹筋', '背筋', '腕立て伏せ', 'プランク', '機械', 'その他'] 
-            },
-            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
-            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit
+        window.dbData = JSON.parse(localStorage.getItem('sz_v11_db') || JSON.stringify({
+            user: { name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null, groupCode: null, groupName: null },
+            records: [],
+            todos
