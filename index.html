@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.4.1</title>
+    <title>Satoz Diary Ver. α.6</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -50,9 +50,31 @@
                 if (home) home.classList.add('active');
             }
         };
+
+        window.resetLoginStatus = function() {
+            const statusMsg = document.getElementById('login-status-msg');
+            const loginBtn = document.getElementById('google-login-btn');
+            if (statusMsg) statusMsg.classList.add('hidden');
+            if (loginBtn) {
+                loginBtn.disabled = false;
+                loginBtn.classList.remove('opacity-50');
+            }
+        };
     </script>
 </head>
 <body>
+
+    <!-- 🌟 再読み込み（Pull-to-refresh）時のログイン画面一瞬映り防止スクリプト -->
+    <script>
+        (function() {
+            try {
+                const localDb = JSON.parse(localStorage.getItem('sz_v11_db') || '{}');
+                if (localDb.user && localDb.user.id) {
+                    document.write('<style>#login-screen{display:none !important;} #app-shell{display:block !important;}</style>');
+                }
+            } catch(e) {}
+        })();
+    </script>
 
     <!-- 写真拡大用モーダル -->
     <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="window.closeImageModal()">
@@ -104,12 +126,17 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.4</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.6</p>
             
-            <button onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
+            <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
                 <span>Googleでログイン</span>
             </button>
+
+            <div id="login-status-msg" class="hidden w-full mb-3 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 rounded-xl text-left">
+                <p id="login-status-text" class="text-[10px] font-bold text-blue-600 dark:text-blue-300">ログイン処理中...</p>
+                <button onclick="window.resetLoginStatus()" class="mt-2 text-[9px] font-bold text-red-500 underline">キャンセル / リセット</button>
+            </div>
 
             <button onclick="window.demoLogin()" class="w-full bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 text-gray-700 dark:text-gray-200 font-bold py-3 px-6 rounded-2xl text-xs transition">
                 👨‍💻 ゲストとして試す (デモモード)
@@ -189,7 +216,7 @@
                 </div>
             </section>
 
-            <!-- Timeline (英語の見出し「Timeline」に修正) -->
+            <!-- Timeline -->
             <section id="timeline" class="view-section">
                 <div class="mb-4">
                     <h2 class="text-xl font-black mb-2 italic">Timeline</h2>
@@ -201,7 +228,7 @@
                 <div id="feed-list" class="space-y-4">読み込み中...</div>
             </section>
 
-            <!-- Results (本日の日記一覧カード付き) -->
+            <!-- Results -->
             <section id="results" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">Results</h2>
@@ -229,7 +256,6 @@
                     <div id="result-todo-list" class="space-y-2"></div>
                 </div>
 
-                <!-- 🌟 本日の日記（箇条書き表示カード） -->
                 <div class="glass-card p-4">
                     <h3 class="text-xs font-bold text-gray-400 mb-3 uppercase italic flex items-center gap-1.5">
                         <i class="bi bi-journal-text text-blue-500"></i>
@@ -380,17 +406,45 @@
 
         window.cloud = {
             login: async () => {
-                if (!auth) return alert("Firebase認証が初期化されていません。デモモードをご利用ください。");
+                if (!auth) {
+                    alert("Firebaseが読み込めません。デモモードをご利用ください。");
+                    return window.demoLogin();
+                }
+
+                const statusBox = document.getElementById('login-status-msg');
+                const statusText = document.getElementById('login-status-text');
+                const loginBtn = document.getElementById('google-login-btn');
+
+                if (statusBox) statusBox.classList.remove('hidden');
+                if (statusText) statusText.innerText = "Googleログイン処理中... (画面が開かない場合は下記参照)";
+                if (loginBtn) {
+                    loginBtn.disabled = true;
+                    loginBtn.classList.add('opacity-50');
+                }
+
+                const timeoutTimer = setTimeout(() => {
+                    if (statusText) {
+                        statusText.innerText = "⚠️ 応答がありません。Firebaseコンソールに「承認済みドメイン」が追加されているか、ブラウザのポップアップブロックをご確認ください。";
+                    }
+                    if (loginBtn) {
+                        loginBtn.disabled = false;
+                        loginBtn.classList.remove('opacity-50');
+                    }
+                }, 8000);
+
                 try {
                     await signInWithPopup(auth, provider);
+                    clearTimeout(timeoutTimer);
                 } catch (error) {
+                    clearTimeout(timeoutTimer);
+                    window.resetLoginStatus();
                     console.error("Firebase Login Error:", error);
                     if (error.code === 'auth/unauthorized-domain') {
                         alert("【エラー: 承認未追加ドメイン】\nFirebaseコンソールの Authentication > Settings > Authorized domains に、現在ご利用中のGitHubのURL（例: username.github.io）を追加してください。");
                     } else if (error.code === 'auth/popup-closed-by-user') {
-                        alert("ログイン画面が閉じるかキャンセルされました。");
+                        // キャンセル
                     } else {
-                        alert("Googleログインに失敗しました:\n" + error.message);
+                        alert("Googleログインエラー:\n" + error.message);
                     }
                 }
             },
@@ -1025,7 +1079,6 @@
             alert(`グループ「${groupName}」から脱退しました。`);
         };
 
-        // 🌟 Results 画面 (本日の日記一覧箇条書きエリアのレンダリング)
         window.renderResultsView = function() {
             const date = document.getElementById('results-date').value;
             const all = [...baseCats, ...(window.dbData.cats || [])];
@@ -1111,7 +1164,6 @@
                 `).join('') || `<p class="text-center text-xs text-gray-400">達成した予定はありません</p>`;
             }
 
-            // 🌟 本日の日記箇条書きリスト
             const diaryList = document.getElementById('result-diary-list');
             if (diaryList) {
                 const diaryRecs = window.dbData.records.filter(r => r.date === date && r.catId === 'diary');
@@ -1133,4 +1185,219 @@
 
         window.toggleTodo = function(id) {
             const t = window.dbData.todos.find(x => x.id === id);
-            if (t)
+            if (t) {
+                t.done = !t.done;
+                window.saveLocal();
+                if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                    window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                }
+            }
+        };
+
+        window.updatePreCal = function() {
+            const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
+            const m = parseFloat(document.getElementById('v_mins')?.value || 0);
+            const totalHours = h + (m / 60);
+            const u = window.dbData.user;
+            const w = u.weight || 65;
+
+            let mets = 0;
+            if (window.currentCatId === 'run') {
+                const dist = parseFloat(document.getElementById('v_dist')?.value || 0);
+                if (totalHours > 0 && dist > 0) {
+                    const speed = dist / totalHours;
+                    if (speed < 6) mets = 5.0;
+                    else if (speed < 9) mets = 8.3;
+                    else if (speed < 12) mets = 10.5;
+                    else mets = 12.5;
+                } else {
+                    mets = 8.3;
+                }
+            } else if (window.currentCatId === 'exercise') {
+                const subSelect = document.getElementById('v_sub_cat')?.value;
+                if (subSelect === '腹筋' || subSelect === '背筋' || subSelect === '腕立て伏せ') mets = 3.8;
+                else if (subSelect === 'プランク') mets = 3.3;
+                else if (subSelect === '機械') mets = 5.0;
+                else mets = 4.0;
+            } else {
+                const cat = baseCats.find(c => c.id === window.currentCatId);
+                if (cat && cat.mets) mets = cat.mets;
+            }
+
+            if (mets > 0 && totalHours > 0) {
+                const cal = Math.round(mets * w * totalHours * 1.05);
+                document.getElementById('cal-val').innerText = `${cal} kcal`;
+                document.getElementById('calorie-preview').classList.remove('hidden');
+            } else {
+                document.getElementById('calorie-preview').classList.add('hidden');
+            }
+        };
+
+        window.formatTime = function(h) {
+            const hr = Math.floor(h);
+            const mn = Math.round((h - hr) * 60);
+            return hr > 0 ? `${hr}h ${mn}m` : `${mn}m`;
+        };
+
+        window.formatTimeShort = function(mins) {
+            if (!mins) return '0m';
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return h > 0 ? `${h}h ${m}m` : `${m}m`;
+        };
+
+        window.saveSettings = async function() {
+            window.dbData.user.name = document.getElementById('set-name').value;
+            window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
+            window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
+            window.dbData.user.age = parseInt(document.getElementById('set-age').value || 20);
+            
+            window.saveLocal();
+            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                alert("設定を保存しました！");
+            }
+        };
+
+        window.handleAvatarFileSelect = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => {
+                window.dbData.user.avatar = ev.target.result;
+                document.getElementById('set-avatar-preview').src = ev.target.result;
+                window.saveLocal();
+            };
+            r.readAsDataURL(file);
+        };
+
+        window.renderProfilePage = function() {
+            const u = window.dbData.user;
+            const area = document.getElementById('profile-header-area');
+            if (area) {
+                area.innerHTML = `
+                    <div class="glass-card p-6 mb-6 flex flex-col items-center text-center">
+                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.name)}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover">
+                        <h2 class="text-xl font-black mt-4">${u.name}</h2>
+                        <p class="text-[10px] text-gray-400">UID: ${u.id}</p>
+                    </div>`;
+            }
+
+            const gList = document.getElementById('my-groups-list');
+            if (gList) {
+                const groups = u.groups || [];
+                if (groups.length > 0) {
+                    gList.innerHTML = groups.map(g => `
+                        <div class="flex items-center justify-between p-2.5 bg-black/5 dark:bg-white/5 rounded-xl text-xs">
+                            <div>
+                                <span class="font-bold text-gray-800 dark:text-gray-200">${g.name}</span>
+                                <span class="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 font-mono text-[10px] px-2 py-0.5 rounded-full ml-1 font-bold">${g.code}</span>
+                            </div>
+                            <button onclick="window.handleLeaveGroup('${g.code}')" class="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded-lg hover:bg-red-100 transition">🚪 脱退</button>
+                        </div>
+                    `).join('');
+                } else {
+                    gList.innerHTML = `<p class="text-gray-400 text-xs">現在どのグループにも所属していません</p>`;
+                }
+            }
+        };
+
+        window.updateRankList = function(id) {
+            const u = window.dbData.user;
+            window.rankCatId = id;
+
+            const cat = baseCats.find(c => c.id === window.rankCatId) || baseCats[0];
+            const unitStr = cat ? cat.unit : '';
+
+            const scopeTabs = document.getElementById('rank-scope-tabs');
+            if (scopeTabs) {
+                const userGroups = u.groups || [];
+                scopeTabs.innerHTML = `
+                    <button onclick="window.setRankScope('global')" class="chip ${window.currentRankScope === 'global' ? 'active' : ''}">🌐 グローバル</button>
+                    ${userGroups.map(g => `
+                        <button onclick="window.setRankScope('${g.code}')" class="chip ${window.currentRankScope === g.code ? 'active' : ''}">👥 ${g.name}</button>
+                    `).join('')}
+                `;
+            }
+
+            const filters = document.getElementById('rank-filters');
+            if (filters) {
+                filters.innerHTML = baseCats.filter(c => c.type !== 'todo').map(c => `
+                    <button onclick="window.updateRankList('${c.id}')" class="chip ${window.rankCatId === c.id ? 'active' : ''}">${c.name}</button>
+                `).join('');
+            }
+            
+            let myV = 0;
+            if (window.rankCatId === 'weight') {
+                const weightRecs = window.dbData.records.filter(r => r.catId === 'weight');
+                myV = weightRecs.length > 0 ? weightRecs[0].val : (u.weight || 65);
+            } else {
+                myV = window.dbData.records.filter(r => r.catId === window.rankCatId).reduce((s, a) => s + a.val, 0);
+            }
+            
+            let valFormatted = `${myV.toFixed(1)} ${unitStr}`;
+            if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
+                valFormatted = window.formatTime(myV);
+            } else if (cat && cat.type === 'diary') {
+                valFormatted = `${myV} 文字`;
+            }
+
+            const display = document.getElementById('ranking-display');
+            if (display) {
+                display.innerHTML = `
+                    <div class="flex items-center p-4 bg-white/50 dark:bg-white/5">
+                        <span class="w-8 font-black text-yellow-500">1</span>
+                        <span class="flex-1 font-bold text-sm">${window.dbData.user.name} (あなた)</span>
+                        <span class="font-black text-blue-600 text-xs">${valFormatted}</span>
+                    </div>`;
+            }
+        };
+
+        window.setRankScope = function(scope) {
+            window.currentRankScope = scope;
+            window.updateRankList(window.rankCatId);
+        };
+
+        if (auth) {
+            onAuthStateChanged(auth, async (user) => {
+                const loginScreen = document.getElementById('login-screen');
+                const appShell = document.getElementById('app-shell');
+
+                if (user) {
+                    window.isDemoMode = false;
+                    if (loginScreen) loginScreen.style.display = 'none';
+                    if (appShell) appShell.style.display = 'block';
+
+                    window.dbData.user.name = user.displayName || window.dbData.user.name || "User";
+                    window.dbData.user.id = user.uid;
+                    window.dbData.user.avatar = user.photoURL || window.dbData.user.avatar;
+
+                    window.initApp();
+
+                    try {
+                        const cloudData = await window.cloud.getUserData(user.uid);
+                        if (cloudData) {
+                            window.dbData = { ...window.dbData, ...cloudData };
+                            window.dbData.user.groups = window.dbData.user.groups || [];
+                            window.saveLocal();
+                            window.initApp();
+                        }
+                        await window.cloud.saveAllUserData(user.uid, window.dbData);
+                    } catch(e) {
+                        console.warn("クラウド同期処理スキップ:", e);
+                    }
+
+                    try {
+                        window.cloud.listenTimeline((posts) => {
+                            window.allPosts = posts;
+                            window.renderTimeline();
+                        });
+                    } catch(e) {
+                        console.warn("TL受信スキップ:", e);
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
