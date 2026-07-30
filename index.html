@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary v13.2 Cloud Complete</title>
+    <title>Satoz Diary v16.0 Group Custom Ranks</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
     <!-- Firebase SDK (Auth & Firestore) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -31,7 +31,11 @@
             login: () => signInWithPopup(auth, provider),
             logout: () => signOut(auth),
             saveAllUserData: async (uid, data) => {
-                try { await setDoc(doc(db, "users", uid), data); } catch(e) { console.error(e); }
+                try { 
+                    await setDoc(doc(db, "users", uid), data, { merge: true });
+                } catch(e) { 
+                    console.error("Cloud save error:", e); 
+                }
             },
             getUserData: async (uid) => {
                 try {
@@ -45,11 +49,32 @@
                 } catch(e) { console.error(e); }
             },
             listenTimeline: (callback) => {
-                const q = query(collection(db, "timeline"), orderBy("createdAt", "desc"), limit(40));
+                const q = query(collection(db, "timeline"), orderBy("createdAt", "desc"), limit(50));
                 return onSnapshot(q, (snapshot) => {
                     const posts = snapshot.docs.map(doc => doc.data());
                     callback(posts);
                 });
+            },
+            createGroup: async (groupName, user) => {
+                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const groupData = {
+                    code: code,
+                    name: groupName,
+                    hostUid: user.id,
+                    members: [{ uid: user.id, name: user.name, avatar: user.avatar }]
+                };
+                await setDoc(doc(db, "groups", code), groupData);
+                return { code, name: groupName };
+            },
+            joinGroup: async (code, user) => {
+                const ref = doc(db, "groups", code.toUpperCase());
+                const snap = await getDoc(ref);
+                if (!snap.exists()) return { success: false, msg: "グループが見つかりません" };
+                
+                await updateDoc(ref, {
+                    members: arrayUnion({ uid: user.id, name: user.name, avatar: user.avatar })
+                });
+                return { success: true, group: snap.data() };
             }
         };
 
@@ -61,9 +86,9 @@
                 const cloudData = await window.cloud.getUserData(user.uid);
                 if (cloudData) window.dbData = cloudData;
                 
-                window.dbData.user.name = user.displayName || window.dbData.user.name || "User";
+                window.dbData.user.name = window.dbData.user.name || user.displayName || "User";
                 window.dbData.user.id = user.uid;
-                window.dbData.user.avatar = user.photoURL || window.dbData.user.avatar;
+                window.dbData.user.avatar = window.dbData.user.avatar || user.photoURL;
 
                 saveLocal();
                 await window.cloud.saveAllUserData(user.uid, window.dbData);
@@ -72,7 +97,10 @@
                 appShell.style.display = 'block';
 
                 initApp();
-                window.cloud.listenTimeline((posts) => renderTimeline(posts));
+                window.cloud.listenTimeline((posts) => {
+                    window.allPosts = posts;
+                    renderTimeline();
+                });
             } else {
                 loginScreen.style.display = 'flex';
                 appShell.style.display = 'none';
@@ -110,7 +138,13 @@
 </head>
 <body>
 
-    <!-- 1. Google ログイン画面 -->
+    <!-- 写真モーダル -->
+    <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="closeImageModal()">
+        <img id="image-modal-img" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
+        <button class="absolute top-6 right-6 text-white text-3xl font-bold cursor-pointer">×</button>
+    </div>
+
+    <!-- Google ログイン画面 -->
     <div id="login-screen" class="fixed inset-0 z-[10000] bg-white dark:bg-black flex flex-col items-center justify-center text-center p-8">
         <div class="glass-card p-8 max-w-sm w-full shadow-2xl flex flex-col items-center">
             <div class="w-16 h-16 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-4 text-3xl font-black italic">S</div>
@@ -121,15 +155,14 @@
                 <i class="bi bi-google text-lg"></i>
                 <span>Googleでログイン</span>
             </button>
-            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v13.2</p>
+            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v16.0</p>
         </div>
     </div>
 
-    <!-- 2. アプリ本体 -->
+    <!-- アプリ本体 -->
     <div id="app-shell" style="display:none;">
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="showSection('home')">Satoz Diary</h1>
-            <!-- 右上エリア: 時計 ＆ 設定(歯車アイコン) -->
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
                 <button onclick="showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
@@ -161,7 +194,21 @@
                         <div>日付<input type="date" id="rec-date" class="w-full mt-1"></div>
                         <div>時刻<input type="time" id="rec-time" class="w-full mt-1"></div>
                     </div>
+
                     <div id="dynamic-fields" class="space-y-4"></div>
+
+                    <div class="mt-4">
+                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="handleRecPhotoSelect(event)">
+                        <button type="button" onclick="document.getElementById('rec-photo-input').click()" class="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-xl flex items-center gap-1.5">
+                            <i class="bi bi-camera-fill"></i>
+                            <span>📷 写真を追加</span>
+                        </button>
+                        <div id="rec-photo-preview-box" class="hidden relative mt-2 w-24 h-24">
+                            <img id="rec-photo-preview-img" class="w-24 h-24 rounded-xl object-cover border-2 border-blue-500/30">
+                            <button type="button" onclick="clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
+                        </div>
+                    </div>
+
                     <textarea id="rec-comment" placeholder="一言メモ（任意）" rows="2" class="mt-4 w-full text-xs"></textarea>
                     
                     <div id="calorie-preview" class="hidden mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-200">
@@ -172,16 +219,54 @@
                     <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
                 </div>
                 
-                <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2">＋ カテゴリー追加</button>
+                <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2 hover:bg-black/5 transition">＋ カテゴリー追加</button>
             </section>
 
-            <!-- Timeline (Firebase連動) -->
+            <!-- カテゴリー追加画面 -->
+            <section id="cat-maker" class="view-section">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-black italic">カテゴリー追加</h2>
+                    <button onclick="showSection('home')" class="text-xs font-bold text-gray-400">戻る</button>
+                </div>
+                <div class="glass-card p-6 space-y-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">カテゴリー名</label>
+                        <input type="text" id="new-cat-name" placeholder="例: 読書, 水分補給, ピアノ" class="w-full mt-1">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-2 block">アイコンの選択</label>
+                        <div id="icon-picker" class="grid grid-cols-6 gap-2"></div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">単位の選択</label>
+                        <select id="new-cat-unit-type" class="w-full mt-1" onchange="toggleCustomUnit(this.value)">
+                            <option value="time">時間 (h / m)</option>
+                            <option value="kcal">カロリー (kcal)</option>
+                            <option value="kg">体重・重量 (kg)</option>
+                            <option value="km">距離 (km)</option>
+                            <option value="文字">文字数 (文字)</option>
+                            <option value="回">回数 (回)</option>
+                            <option value="custom">その他 (自由入力)</option>
+                        </select>
+                    </div>
+                    <div id="custom-unit-box" class="hidden">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">単位を入力</label>
+                        <input type="text" id="new-cat-custom-unit" placeholder="例: ページ, ml, 錠" class="w-full mt-1">
+                    </div>
+                    <button onclick="createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">カテゴリーを作成</button>
+                </div>
+            </section>
+
+            <!-- Timeline (フィード) -->
             <section id="timeline" class="view-section">
-                <h2 class="text-xl font-black mb-6 italic text-blue-600">Global Feed</h2>
+                <div class="mb-4">
+                    <h2 class="text-xl font-black mb-3 italic text-blue-600">Feed</h2>
+                    <div id="tl-group-banner" class="flex gap-2 overflow-x-auto pb-2"></div>
+                </div>
                 <div id="feed-list" class="space-y-4">読み込み中...</div>
             </section>
 
-            <!-- Results (合計・前日比表示) -->
+            <!-- Results -->
             <section id="results" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">Results</h2>
@@ -194,473 +279,35 @@
                 </div>
             </section>
 
-            <!-- Rankings -->
+            <!-- Rankings (グローバル:基本カテゴリーのみ / グループ:カスタム込み) -->
             <section id="ranking" class="view-section">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-3">
                     <h2 class="text-xl font-black italic">Rankings</h2>
                     <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
                 </div>
+                
+                <div id="rank-scope-tabs" class="flex gap-2 mb-3"></div>
                 <div id="rank-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4"></div>
                 <div id="ranking-display" class="glass-card overflow-hidden"></div>
             </section>
 
-            <!-- Profile -->
+            <!-- Profile ＆ グループ -->
             <section id="profile" class="view-section">
                 <div id="profile-header-area"></div>
+
+                <div class="glass-card p-5 mb-6 space-y-4 border-2 border-blue-500/20">
+                    <h3 class="text-xs font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                        <i class="bi bi-people-fill text-lg"></i>
+                        <span>グループ機能 (6桁招待コード)</span>
+                    </h3>
+                    <div id="my-group-info" class="text-xs"></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
+                        <button onclick="handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
+                    </div>
+                </div>
+
                 <div class="glass-card p-6 mb-6 text-center">
                     <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Time Allocation (24h)</h3>
                     <canvas id="profilePieChart"></canvas>
                 </div>
-                <div class="glass-card p-6 mb-6">
-                    <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-4 text-center">Weekly Statistics</h3>
-                    <canvas id="profileBarChart"></canvas>
-                </div>
-            </section>
-
-            <!-- Settings -->
-            <section id="settings" class="view-section">
-                <h2 class="text-xl font-bold mb-6 text-center">Settings</h2>
-                <div class="glass-card p-5 space-y-4">
-                    <div class="flex flex-col items-center gap-2">
-                        <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
-                        <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
-                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="handleFile(event)">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">名前</label>
-                        <input type="text" id="set-name" class="w-full mt-1">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">ユーザーID (UID)</label>
-                        <input type="text" id="set-id" class="w-full mt-1 opacity-70" readonly>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="text-[10px] font-bold text-gray-400 uppercase">体重(kg)</label>
-                            <input type="number" id="set-weight" class="w-full mt-1">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-bold text-gray-400 uppercase">身長(cm)</label>
-                            <input type="number" id="set-height" class="w-full mt-1">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-bold text-gray-400 uppercase">年齢</label>
-                            <input type="number" id="set-age" class="w-full mt-1">
-                        </div>
-                    </div>
-                    <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">設定をクラウドへ保存</button>
-                    <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2">ログアウト</button>
-                </div>
-            </section>
-        </main>
-
-        <!-- タブバー (設定を外して5つに整理) -->
-        <nav class="tab-bar">
-            <button onclick="showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
-            <button onclick="showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
-            <button onclick="showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
-            <button onclick="showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
-            <button onclick="showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
-        </nav>
-    </div>
-
-    <!-- アプリのメイン JavaScript ロジック -->
-    <script>
-        window.dbData = JSON.parse(localStorage.getItem('sz_v11_db') || JSON.stringify({
-            user: { name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null },
-            records: [],
-            todos: [],
-            cats: []
-        }));
-
-        const baseCats = [
-            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
-            { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
-            { id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0 },
-            { id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0 },
-            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
-            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
-            { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
-        ];
-
-        let currentCatId = '', rankCatId = 'study';
-
-        function initApp() {
-            const u = window.dbData.user;
-            document.getElementById('set-name').value = u.name || '';
-            document.getElementById('set-id').value = u.id || '';
-            document.getElementById('set-weight').value = u.weight || 65;
-            document.getElementById('set-height').value = u.height || 170;
-            document.getElementById('set-age').value = u.age || 20;
-            document.getElementById('set-avatar-preview').src = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`;
-            
-            document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
-            document.getElementById('rank-date').value = new Date().toISOString().split('T')[0];
-
-            renderCategories();
-            renderAll();
-            renderResultsView();
-
-            setInterval(() => {
-                const clock = document.getElementById('realtime-clock');
-                if (clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
-            }, 1000);
-        }
-
-        // 記録保存 (ランニング時は 距離(km) + 時間(分) を両方保持)
-        async function saveRecord() {
-            const memo = document.getElementById('rec-comment').value.trim();
-            const date = document.getElementById('rec-date').value;
-            const time = document.getElementById('rec-time').value;
-            let val = 0;
-            let durationMin = 0; // 所要時間（分）
-            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === currentCatId);
-
-            if (currentCatId === 'schedule') {
-                const task = document.getElementById('v_task_todo').value;
-                if (!task) return alert("予定内容を入力してください");
-                const sel = document.getElementById('todo-date-sel').value;
-                const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate() + 1)).toISOString().split('T')[0];
-                window.dbData.todos.push({ id: Date.now(), time, task, memo, done: false, date: targetDate });
-            } else {
-                if (currentCatId === 'run') {
-                    // ランニング: val = 距離(km), durationMin = 走った時間(分)
-                    val = parseFloat(document.getElementById('v_dist')?.value || 0);
-                    const hrs = parseFloat(document.getElementById('v_hrs')?.value || 0);
-                    const mins = parseFloat(document.getElementById('v_mins')?.value || 0);
-                    durationMin = Math.round(hrs * 60 + mins);
-                } else if (cat.type === 'time') {
-                    val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
-                    durationMin = Math.round(val * 60);
-                } else if (currentCatId === 'sleep') {
-                    const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
-                    const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
-                    val = (e - s) / 3600000;
-                    if (val < 0) val += 24;
-                    durationMin = Math.round(val * 60);
-                } else if (currentCatId === 'diary') {
-                    val = memo.length;
-                } else {
-                    val = parseFloat(document.getElementById('v1')?.value || 0);
-                }
-                
-                if (currentCatId === 'weight') window.dbData.user.weight = val;
-
-                // タイムラインや一覧での表示文字列
-                let valDispStr = `${val.toFixed(1)} ${cat ? cat.unit : ''}`;
-                if (currentCatId === 'run') {
-                    valDispStr = `${val.toFixed(1)} km (${durationMin}分)`;
-                } else if (cat.type === 'time' || cat.type === 'sleep') {
-                    valDispStr = formatTime(val);
-                }
-
-                const post = {
-                    id: Date.now(),
-                    catId: currentCatId,
-                    catName: cat ? cat.name : "記録",
-                    val: val,
-                    durationMin: durationMin,
-                    valDisp: valDispStr,
-                    date: date,
-                    time: time,
-                    comment: memo,
-                    userName: window.dbData.user.name,
-                    userAvatar: window.dbData.user.avatar
-                };
-
-                window.dbData.records.unshift(post);
-
-                if (window.cloud && window.cloud.postTimeline) {
-                    await window.cloud.postTimeline(post);
-                }
-            }
-
-            saveLocal();
-            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
-            }
-
-            closeInput();
-            alert("クラウドへ正常に保存・同期されました！");
-        }
-
-        function saveLocal() {
-            localStorage.setItem('sz_v11_db', JSON.stringify(window.dbData));
-            renderAll();
-        }
-
-        function renderAll() {
-            const today = new Date().toISOString().split('T')[0];
-            const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
-            
-            const todoContainer = document.getElementById('todo-display-list');
-            if (todoContainer) {
-                todoContainer.innerHTML = `
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">TODAY (${today})</p>
-                    ${window.dbData.todos.filter(t => t.date === today).map(t => `
-                        <div class="flex items-start gap-3 p-3 bg-white/40 dark:bg-white/5 rounded-xl shadow-sm">
-                            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})" class="mt-1">
-                            <div>
-                                <p class="todo-title ${t.done ? 'todo-checked' : ''}">${t.task}</p>
-                                ${t.memo ? `<p class="todo-memo">${t.memo}</p>` : ''}
-                            </div>
-                        </div>
-                    `).join('') || '<p class="text-center text-xs opacity-30 py-2">今日の予定はありません</p>'}
-
-                    <p class="text-[10px] font-bold text-gray-400 mt-4 uppercase tracking-wider">TOMORROW (${tomorrow})</p>
-                    ${window.dbData.todos.filter(t => t.date === tomorrow).map(t => `
-                        <div class="p-3 bg-white/10 rounded-xl opacity-60">
-                            <p class="todo-title">${t.task}</p>
-                        </div>
-                    `).join('') || '<p class="text-center text-xs opacity-30 py-2">明日の予定はありません</p>'}
-                `;
-            }
-        }
-
-        function renderCategories() {
-            const grid = document.getElementById('category-grid');
-            if (grid) {
-                grid.innerHTML = baseCats.map(c => `
-                    <button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center hover:scale-105 transition">
-                        <i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i>
-                        <span class="text-[9px] font-bold">${c.name}</span>
-                    </button>
-                `).join('');
-            }
-        }
-
-        function renderTimeline(posts) {
-            const list = document.getElementById('feed-list');
-            if (!list) return;
-
-            if (posts.length === 0) {
-                list.innerHTML = `<p class="text-center text-gray-400 text-xs py-8">投稿がありません</p>`;
-                return;
-            }
-
-            list.innerHTML = posts.map(p => `
-                <div class="glass-card p-4 text-left shadow-sm">
-                    <div class="flex items-center gap-2 mb-2">
-                        <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-6 h-6 rounded-full object-cover">
-                        <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName || '記録'}・${p.userName || '匿名'}</p>
-                    </div>
-                    <p class="todo-title">${p.valDisp}</p>
-                    ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
-                    <p class="text-[8px] text-gray-400 mt-2">${p.date || ''} ${p.time || ''}</p>
-                </div>
-            `).join('');
-        }
-
-        // Results（結果画面）描画: ランニングは「距離(km) (〇〇分)」で表示
-        function renderResultsView() {
-            const date = document.getElementById('results-date').value;
-            const prev = new Date(new Date(date).setDate(new Date(date).getDate() - 1)).toISOString().split('T')[0];
-            const all = [...baseCats, ...(window.dbData.cats || [])];
-            
-            const grid = document.getElementById('result-sum-grid');
-            if (grid) {
-                grid.innerHTML = all.filter(c => c.type !== 'todo').map(c => {
-                    const curRecs = window.dbData.records.filter(r => r.date === date && r.catId === c.id);
-                    const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s, a) => s + a.val, 0);
-                    const curMins = curRecs.reduce((s, a) => s + (a.durationMin || 0), 0);
-                    
-                    const oldRecs = window.dbData.records.filter(r => r.date === prev && r.catId === c.id);
-                    const old = (c.id === 'weight') ? (oldRecs[0]?.val || 0) : oldRecs.reduce((s, a) => s + a.val, 0);
-                    const diff = cur - old;
-                    
-                    let valDisp = '';
-                    if (c.id === 'run') {
-                        // ランニング: 青文字で距離(km) ＋ 隣に小文字で (何分)
-                        valDisp = `${cur.toFixed(1)} km <span class="text-[10px] text-gray-500 font-medium font-normal ml-0.5">(${curMins}分)</span>`;
-                    } else if (c.type === 'time' || c.type === 'sleep') {
-                        valDisp = formatTime(cur);
-                    } else if (c.type === 'diary') {
-                        valDisp = `${cur}文字`;
-                    } else {
-                        valDisp = `${cur.toFixed(1)} ${c.unit}`;
-                    }
-
-                    const diffH = cur === 0 ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
-                    
-                    return cur > 0 ? `
-                        <div class="glass-card p-3 text-center">
-                            <p class="text-[8px] font-bold text-gray-400 uppercase">${c.name}</p>
-                            <p class="text-sm font-black text-blue-600">${valDisp}</p>
-                            ${diffH}
-                        </div>
-                    ` : '';
-                }).join('') || `<p class="col-span-2 text-center text-xs text-gray-400 py-4">この日の記録はありません</p>`;
-            }
-
-            const todoList = document.getElementById('result-todo-list');
-            if (todoList) {
-                todoList.innerHTML = window.dbData.todos.filter(t => t.date === date && t.done).map(t => `
-                    <div class="p-2 bg-green-50 dark:bg-green-900/20 text-[10px] rounded-lg text-green-700 dark:text-green-300 font-bold">✓ ${t.task}</div>
-                `).join('') || `<p class="text-center text-xs text-gray-400">達成した予定はありません</p>`;
-            }
-        }
-
-        function openInput(id) {
-            currentCatId = id;
-            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === id);
-            document.getElementById('input-area').classList.remove('hidden');
-            document.getElementById('input-title').innerText = cat ? cat.name : "予定";
-            document.getElementById('rec-date').value = new Date().toISOString().split('T')[0];
-            document.getElementById('rec-time').value = new Date().toTimeString().slice(0, 5);
-            
-            const fields = document.getElementById('dynamic-fields');
-            fields.innerHTML = '';
-            document.getElementById('calorie-preview').classList.add('hidden');
-
-            if (id === 'study' || id === 'exercise' || id === 'run') {
-                if (id === 'run') {
-                    fields.innerHTML = `<input type="number" id="v_dist" placeholder="走った距離(km)" class="w-full mb-2" oninput="updatePreCal()">`;
-                }
-                fields.innerHTML += `
-                    <div class="flex gap-2 justify-center items-center">
-                        <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
-                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
-                    </div>`;
-                document.getElementById('calorie-preview').classList.remove('hidden');
-            } else if (id === 'sleep') {
-                fields.innerHTML = `
-                    <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
-                        <div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}" class="w-full mt-1"></div>
-                        <div>時刻<input type="time" id="sleep_s_time" value="23:00" class="w-full mt-1"></div>
-                        <div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}" class="w-full mt-1"></div>
-                        <div>時刻<input type="time" id="sleep_e_time" value="07:00" class="w-full mt-1"></div>
-                    </div>`;
-            } else if (id === 'schedule') {
-                fields.innerHTML = `
-                    <select id="todo-date-sel" class="w-full mb-2">
-                        <option value="today">今日</option>
-                        <option value="tomorrow">明日</option>
-                    </select>
-                    <input type="text" id="v_task_todo" placeholder="予定内容 (例: 買い物)" class="w-full">`;
-            } else {
-                fields.innerHTML = `<input type="number" id="v1" placeholder="${cat ? cat.unit : ''}を入力" class="w-full">`;
-            }
-        }
-
-        function closeInput() {
-            document.getElementById('input-area').classList.add('hidden');
-        }
-
-        function toggleTodo(id) {
-            const t = window.dbData.todos.find(x => x.id === id);
-            if (t) {
-                t.done = !t.done;
-                saveLocal();
-                if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                    window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
-                }
-            }
-        }
-
-        function updatePreCal() {
-            const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
-            const m = parseFloat(document.getElementById('v_mins')?.value || 0);
-            const cat = baseCats.find(c => c.id === currentCatId);
-            if (cat && cat.mets) {
-                const cal = Math.round(cat.mets * (window.dbData.user.weight || 65) * (h + m / 60) * 1.05);
-                document.getElementById('cal-val').innerText = `${cal} kcal`;
-            }
-        }
-
-        function formatTime(h) {
-            const hr = Math.floor(h);
-            const mn = Math.round((h - hr) * 60);
-            return hr > 0 ? `${hr}h ${mn}m` : `${mn}m`;
-        }
-
-        function showSection(id) {
-            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-            const target = document.getElementById(id);
-            if (target) target.classList.add('active');
-            
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            // ナビゲーションのハイライト
-            const navBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.getAttribute('onclick')?.includes(`'${id}'`));
-            if (navBtn) navBtn.classList.add('active');
-
-            if (id === 'ranking') updateRankList(rankCatId);
-            if (id === 'results') renderResultsView();
-            if (id === 'profile') renderProfilePage();
-            
-            renderAll();
-        }
-
-        async function saveSettings() {
-            window.dbData.user.name = document.getElementById('set-name').value;
-            window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
-            window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
-            window.dbData.user.age = parseInt(document.getElementById('set-age').value || 20);
-            
-            saveLocal();
-            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
-            }
-            alert("設定を保存し、クラウドと同期しました！");
-        }
-
-        function handleFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const r = new FileReader();
-            r.onload = (ev) => {
-                window.dbData.user.avatar = ev.target.result;
-                document.getElementById('set-avatar-preview').src = ev.target.result;
-                saveLocal();
-            };
-            r.readAsDataURL(file);
-        }
-
-        function renderProfilePage() {
-            const u = window.dbData.user;
-            const area = document.getElementById('profile-header-area');
-            if (area) {
-                area.innerHTML = `
-                    <div class="glass-card p-6 mb-6 flex flex-col items-center text-center">
-                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.name)}" class="w-20 h-20 rounded-full border-4 border-white shadow-xl object-cover">
-                        <h2 class="text-xl font-black mt-4">${u.name}</h2>
-                        <p class="text-[10px] text-gray-400">UID: ${u.id}</p>
-                    </div>`;
-            }
-        }
-
-        // Rankings (ランキング) 描画: 全ての項目に単位(unit)を付加
-        function updateRankList(id) {
-            rankCatId = id;
-            const cat = baseCats.find(c => c.id === id);
-            const unitStr = cat ? cat.unit : '';
-
-            const filters = document.getElementById('rank-filters');
-            if (filters) {
-                filters.innerHTML = baseCats.filter(c => c.type !== 'todo').map(c => `
-                    <button onclick="updateRankList('${c.id}')" class="chip ${rankCatId === c.id ? 'active' : ''}">${c.name}</button>
-                `).join('');
-            }
-            
-            const myV = window.dbData.records.filter(r => r.catId === id).reduce((s, a) => s + a.val, 0);
-            
-            // 時間系カテゴリの場合のフォーマット調整
-            let valFormatted = `${myV.toFixed(1)} ${unitStr}`;
-            if (cat && (cat.type === 'time' || cat.type === 'sleep')) {
-                valFormatted = `${formatTime(myV)}`;
-            } else if (cat && cat.type === 'diary') {
-                valFormatted = `${myV} 文字`;
-            }
-
-            const display = document.getElementById('ranking-display');
-            if (display) {
-                display.innerHTML = `
-                    <div class="flex items-center p-4 bg-white/50 dark:bg-white/5">
-                        <span class="w-8 font-black text-yellow-500">1</span>
-                        <span class="flex-1 font-bold text-sm">${window.dbData.user.name} (あなた)</span>
-                        <span class="font-black text-blue-600 text-xs">${valFormatted}</span>
-                    </div>`;
-            }
-        }
-    </script>
-</body>
-</html>
