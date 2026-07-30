@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary v17.0 Perfect Complete</title>
+    <title>Satoz Diary v17.1 Ultra Stable</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -11,6 +11,20 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- 安全装置: モジュール読み込み完了前のエラー防止ダミー -->
+    <script>
+        window.cloud = window.cloud || {
+            login: () => alert("読み込み中です。少々お待ちください。"),
+            logout: () => {},
+            saveAllUserData: async () => {},
+            getUserData: async () => null,
+            postTimeline: async () => {},
+            listenTimeline: () => {},
+            createGroup: async () => {},
+            joinGroup: async () => {}
+        };
+    </script>
 
     <style>
         :root { --apple-bg: #f5f5f7; --apple-card: rgba(255, 255, 255, 0.85); --apple-text: #1d1d1f; --apple-accent: #0071e3; --glass: blur(25px) saturate(180%); }
@@ -38,7 +52,7 @@
 <body>
 
     <!-- 写真全画面表示モーダル -->
-    <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="window.closeImageModal()">
+    <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="closeImageModal()">
         <img id="image-modal-img" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
         <button class="absolute top-6 right-6 text-white text-3xl font-bold cursor-pointer">×</button>
     </div>
@@ -54,17 +68,17 @@
                 <i class="bi bi-google text-lg"></i>
                 <span>Googleでログイン</span>
             </button>
-            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v17.0</p>
+            <p class="text-[10px] text-gray-400 mt-6">Firebase Cloud Sync Active v17.1</p>
         </div>
     </div>
 
     <!-- 2. アプリ本体 -->
     <div id="app-shell" style="display:none;">
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
-            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="window.showSection('home')">Satoz Diary</h1>
+            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="showSection('home')">Satoz Diary</h1>
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
-                <button onclick="window.showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
+                <button onclick="showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
                     <i class="bi bi-gear-fill text-sm"></i>
                 </button>
             </div>
@@ -77,7 +91,7 @@
                 <div class="glass-card p-5 mb-6 border-l-8 border-yellow-400">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="font-bold text-sm">予定管理 (今日・明日連動)</h2>
-                        <button onclick="window.openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
+                        <button onclick="openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-3 py-1 rounded-full font-bold">+ 予定追加</button>
                     </div>
                     <div id="todo-display-list" class="space-y-4"></div>
                 </div>
@@ -87,7 +101,7 @@
                 <div id="input-area" class="glass-card p-6 mb-6 hidden border-2 border-blue-500/20">
                     <div class="flex justify-between items-center mb-4">
                         <h3 id="input-title" class="font-bold text-lg text-blue-500"></h3>
-                        <div onclick="window.closeInput()" class="cursor-pointer text-xl font-bold">×</div>
+                        <div onclick="closeInput()" class="cursor-pointer text-xl font-bold">×</div>
                     </div>
                     <div class="grid grid-cols-2 gap-2 mb-4 text-[10px] font-bold text-gray-400 uppercase">
                         <div>日付<input type="date" id="rec-date" class="w-full mt-1"></div>
@@ -97,14 +111,14 @@
                     <div id="dynamic-fields" class="space-y-4"></div>
 
                     <div class="mt-4">
-                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="window.handleRecPhotoSelect(event)">
+                        <input type="file" id="rec-photo-input" accept="image/*" class="hidden" onchange="handleRecPhotoSelect(event)">
                         <button type="button" onclick="document.getElementById('rec-photo-input').click()" class="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-xl flex items-center gap-1.5">
                             <i class="bi bi-camera-fill"></i>
                             <span>📷 写真を追加</span>
                         </button>
                         <div id="rec-photo-preview-box" class="hidden relative mt-2 w-24 h-24">
                             <img id="rec-photo-preview-img" class="w-24 h-24 rounded-xl object-cover border-2 border-blue-500/30">
-                            <button type="button" onclick="window.clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
+                            <button type="button" onclick="clearRecPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold flex items-center justify-center shadow">×</button>
                         </div>
                     </div>
 
@@ -115,17 +129,17 @@
                         <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
                     </div>
                     
-                    <button onclick="window.saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
+                    <button onclick="saveRecord()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl mt-4 shadow-lg active:scale-95 transition">クラウドへ保存＆同期</button>
                 </div>
                 
-                <button onclick="window.showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2 hover:bg-black/5 transition">＋ カテゴリー追加</button>
+                <button onclick="showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-gray-400 border-dashed border-2 hover:bg-black/5 transition">＋ カテゴリー追加</button>
             </section>
 
             <!-- カテゴリー追加画面 -->
             <section id="cat-maker" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">カテゴリー追加</h2>
-                    <button onclick="window.showSection('home')" class="text-xs font-bold text-gray-400">戻る</button>
+                    <button onclick="showSection('home')" class="text-xs font-bold text-gray-400">戻る</button>
                 </div>
                 <div class="glass-card p-6 space-y-4">
                     <div>
@@ -138,7 +152,7 @@
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-400 uppercase">単位の選択</label>
-                        <select id="new-cat-unit-type" class="w-full mt-1" onchange="window.toggleCustomUnit(this.value)">
+                        <select id="new-cat-unit-type" class="w-full mt-1" onchange="toggleCustomUnit(this.value)">
                             <option value="time">時間 (h / m)</option>
                             <option value="kcal">カロリー (kcal)</option>
                             <option value="kg">体重・重量 (kg)</option>
@@ -152,7 +166,7 @@
                         <label class="text-[10px] font-bold text-gray-400 uppercase">単位を入力</label>
                         <input type="text" id="new-cat-custom-unit" placeholder="例: 錠, ページ, ml" class="w-full mt-1">
                     </div>
-                    <button onclick="window.createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">カテゴリーを作成</button>
+                    <button onclick="createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">カテゴリーを作成</button>
                 </div>
             </section>
 
@@ -169,7 +183,7 @@
             <section id="results" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">Results</h2>
-                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="window.renderResultsView()">
+                    <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="renderResultsView()">
                 </div>
                 <div id="result-sum-grid" class="grid grid-cols-2 gap-3 mb-6"></div>
                 <div class="glass-card p-4">
@@ -178,11 +192,11 @@
                 </div>
             </section>
 
-            <!-- Rankings (グローバル:基本7つのみ / グループ内:仲間が作ったカテゴリーも表示) -->
+            <!-- Rankings -->
             <section id="ranking" class="view-section">
                 <div class="flex justify-between items-center mb-3">
                     <h2 class="text-xl font-black italic">Rankings</h2>
-                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="window.updateRankList(window.rankCatId)">
+                    <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="updateRankList(rankCatId)">
                 </div>
                 
                 <div id="rank-scope-tabs" class="flex gap-2 mb-3"></div>
@@ -201,8 +215,8 @@
                     </h3>
                     <div id="my-group-info" class="text-xs"></div>
                     <div class="grid grid-cols-2 gap-2">
-                        <button onclick="window.handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
-                        <button onclick="window.handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
+                        <button onclick="handleCreateGroup()" class="bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">グループ作成</button>
+                        <button onclick="handleJoinGroup()" class="bg-black/10 dark:bg-white/10 font-bold py-2.5 rounded-xl text-xs">コードで参加</button>
                     </div>
                 </div>
 
@@ -219,7 +233,7 @@
                     <div class="flex flex-col items-center gap-2">
                         <img id="set-avatar-preview" src="" class="w-20 h-20 rounded-full border-2 border-white shadow-lg object-cover">
                         <button onclick="document.getElementById('avatar-file').click()" class="text-xs text-blue-600 font-bold underline">アイコン変更</button>
-                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="window.handleAvatarFileSelect(event)">
+                        <input type="file" id="avatar-file" class="hidden" accept="image/*" onchange="handleAvatarFileSelect(event)">
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-400 uppercase">名前</label>
@@ -243,7 +257,7 @@
                             <input type="number" id="set-age" class="w-full mt-1">
                         </div>
                     </div>
-                    <button onclick="window.saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">設定をクラウドへ保存</button>
+                    <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">設定をクラウドへ保存</button>
                     <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2">ログアウト</button>
                 </div>
             </section>
@@ -251,50 +265,34 @@
 
         <!-- タブバー -->
         <nav class="tab-bar">
-            <button onclick="window.showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
-            <button onclick="window.showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
-            <button onclick="window.showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
-            <button onclick="window.showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
-            <button onclick="window.showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
+            <button onclick="showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
+            <button onclick="showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
+            <button onclick="showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
+            <button onclick="showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
+            <button onclick="showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
         </nav>
     </div>
 
-    <!-- 単一・統合済みのJavaScriptモジュール -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, addDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyC3nZEh7H-3HdUSJ3KfUu1e2HNgYTa6yRs",
-            authDomain: "satoz-diary.firebaseapp.com",
-            projectId: "satoz-diary",
-            storageBucket: "satoz-diary.firebasestorage.app",
-            messagingSenderId: "596323639753",
-            appId: "1:596323639753:web:f4c4a93d1573eb8ab28818"
+    <!-- 1. メインアプリケーション標準スクリプト (即時同期実行・安定保証) -->
+    <script>
+        // ローカルデータの安全初期化・修復ガード
+        let rawData = {};
+        try { rawData = JSON.parse(localStorage.getItem('sz_v11_db') || '{}'); } catch(e) {}
+        
+        window.dbData = {
+            user: Object.assign({ name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null, groupCode: null, groupName: null }, rawData.user || {}),
+            records: Array.isArray(rawData.records) ? rawData.records : [],
+            todos: Array.isArray(rawData.todos) ? rawData.todos : [],
+            cats: Array.isArray(rawData.cats) ? rawData.cats : []
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
-
-        // 基本データの初期化
-        window.dbData = JSON.parse(localStorage.getItem('sz_v11_db') || JSON.stringify({
-            user: { name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, avatar: null, groupCode: null, groupName: null },
-            records: [],
-            todos: [],
-            cats: []
-        }));
-
         window.allPosts = [];
-        window.currentTLFilter = 'global';
-        window.currentRankScope = 'global'; // 'global' または 'group'
-        window.currentRecPhotoData = null;
-        window.currentCatId = '';
-        window.rankCatId = 'study';
+        let currentTLFilter = 'global';
+        let currentRankScope = 'global';
+        let currentRecPhotoData = null;
+        let currentCatId = '';
+        let rankCatId = 'study';
 
-        // デフォルト基本7カテゴリー（固定）
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg', isCustom: false },
             { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal', isCustom: false },
@@ -314,8 +312,462 @@
         const presetIcons = ['bi-book', 'bi-fire', 'bi-person-walking', 'bi-speedometer2', 'bi-chat-quote', 'bi-moon-stars', 'bi-cup-hot', 'bi-heart-pulse', 'bi-controller', 'bi-music-note', 'bi-droplet', 'bi-capsule'];
         let selectedIcon = presetIcons[0];
 
-        // Firebase 通信メソッド
-        window.cloud = {
-            login: async () => {
-                if (window.location.protocol === 'file:') {
-                    alert("【動作エラー】file:// プロトコルではGoogleログイン
+        function initApp() {
+            const u = window.dbData.user;
+            if (document.getElementById('set-name')) document.getElementById('set-name').value = u.name || '';
+            if (document.getElementById('set-id')) document.getElementById('set-id').value = u.id || '';
+            if (document.getElementById('set-weight')) document.getElementById('set-weight').value = u.weight || 65;
+            if (document.getElementById('set-height')) document.getElementById('set-height').value = u.height || 170;
+            if (document.getElementById('set-age')) document.getElementById('set-age').value = u.age || 20;
+            if (document.getElementById('set-avatar-preview')) document.getElementById('set-avatar-preview').src = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`;
+            
+            if (document.getElementById('results-date')) document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
+            if (document.getElementById('rank-date')) document.getElementById('rank-date').value = new Date().toISOString().split('T')[0];
+
+            renderIconPicker();
+            renderCategories();
+            renderAll();
+            renderResultsView();
+            showSection('home');
+
+            if (!window.clockTimer) {
+                window.clockTimer = setInterval(() => {
+                    const clock = document.getElementById('realtime-clock');
+                    if (clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
+                }, 1000);
+            }
+        }
+
+        function showSection(id) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const navBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.getAttribute('onclick')?.includes(`'${id}'`));
+            if (navBtn) navBtn.classList.add('active');
+
+            if (id === 'ranking') updateRankList(rankCatId);
+            if (id === 'results') renderResultsView();
+            if (id === 'profile') renderProfilePage();
+            
+            renderAll();
+        }
+
+        function handleRecPhotoSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => {
+                currentRecPhotoData = ev.target.result;
+                document.getElementById('rec-photo-preview-img').src = currentRecPhotoData;
+                document.getElementById('rec-photo-preview-box').classList.remove('hidden');
+            };
+            r.readAsDataURL(file);
+        }
+
+        function clearRecPhoto() {
+            currentRecPhotoData = null;
+            document.getElementById('rec-photo-preview-box').classList.add('hidden');
+            document.getElementById('rec-photo-input').value = '';
+        }
+
+        function openImageModal(src) {
+            document.getElementById('image-modal-img').src = src;
+            document.getElementById('image-modal').classList.remove('hidden');
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-modal').classList.add('hidden');
+        }
+
+        function openInput(id) {
+            currentCatId = id;
+            clearRecPhoto();
+            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === id);
+            document.getElementById('input-area').classList.remove('hidden');
+            document.getElementById('input-title').innerText = cat ? cat.name : "予定";
+            document.getElementById('rec-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('rec-time').value = new Date().toTimeString().slice(0, 5);
+            
+            const fields = document.getElementById('dynamic-fields');
+            fields.innerHTML = '';
+            document.getElementById('calorie-preview').classList.add('hidden');
+
+            if (cat && cat.subOptions && cat.subOptions.length > 0) {
+                let subHtml = `<div><label class="text-[10px] font-bold text-gray-400 uppercase">項目・種目</label><select id="v_sub_cat" class="w-full mt-1" onchange="toggleSubOther(this.value)">`;
+                cat.subOptions.forEach(opt => subHtml += `<option value="${opt}">${opt}</option>`);
+                subHtml += `</select></div><div id="v_sub_other_box" class="hidden"><input type="text" id="v_sub_other" placeholder="詳細を入力 (例: 漢文)" class="w-full mt-1"></div>`;
+                fields.innerHTML += subHtml;
+            }
+
+            if (id === 'schedule') {
+                fields.innerHTML = `
+                    <select id="todo-date-sel" class="w-full mb-2">
+                        <option value="today">今日</option>
+                        <option value="tomorrow">明日</option>
+                    </select>
+                    <input type="text" id="v_task_todo" placeholder="予定内容 (例: 買い物)" class="w-full mb-3">
+                    <div class="flex items-center gap-2 p-2 bg-black/5 dark:bg-white/5 rounded-xl">
+                        <input type="checkbox" id="todo-has-time" onchange="document.getElementById('todo-time-box').classList.toggle('hidden', !this.checked)">
+                        <label for="todo-has-time" class="text-xs font-bold">⏰ 時間を指定する</label>
+                    </div>
+                    <div id="todo-time-box" class="hidden mt-2">
+                        <input type="time" id="todo-exact-time" class="w-full" value="12:00">
+                    </div>
+                `;
+            } else if (id === 'run') {
+                fields.innerHTML += `<input type="number" id="v_dist" placeholder="走った距離(km)" class="w-full mb-2" oninput="updatePreCal()">
+                    <div class="flex gap-2 justify-center items-center">
+                        <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
+                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
+                    </div>`;
+                document.getElementById('calorie-preview').classList.remove('hidden');
+            } else if (cat && cat.type === 'time') {
+                fields.innerHTML += `
+                    <div class="flex gap-2 justify-center items-center">
+                        <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
+                        <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="updatePreCal()"><span>m</span>
+                    </div>`;
+                if (cat.mets) document.getElementById('calorie-preview').classList.remove('hidden');
+            } else if (id === 'sleep') {
+                fields.innerHTML += `
+                    <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
+                        <div>就寝日<input type="date" id="sleep_s_date" value="${new Date().toISOString().split('T')[0]}" class="w-full mt-1"></div>
+                        <div>時刻<input type="time" id="sleep_s_time" value="23:00" class="w-full mt-1"></div>
+                        <div>起床日<input type="date" id="sleep_e_date" value="${new Date().toISOString().split('T')[0]}" class="w-full mt-1"></div>
+                        <div>時刻<input type="time" id="sleep_e_time" value="07:00" class="w-full mt-1"></div>
+                    </div>`;
+            } else {
+                fields.innerHTML += `<input type="number" id="v1" placeholder="${cat ? cat.unit : ''}を入力" class="w-full">`;
+            }
+        }
+
+        function toggleSubOther(val) {
+            const box = document.getElementById('v_sub_other_box');
+            if (box) box.classList.toggle('hidden', val !== 'その他');
+        }
+
+        function closeInput() {
+            document.getElementById('input-area').classList.add('hidden');
+        }
+
+        async function saveRecord() {
+            const memo = document.getElementById('rec-comment').value.trim();
+            const date = document.getElementById('rec-date').value;
+            const time = document.getElementById('rec-time').value;
+            let val = 0;
+            let durationMin = 0;
+            const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === currentCatId);
+
+            let subCatVal = '';
+            const subSelect = document.getElementById('v_sub_cat');
+            if (subSelect) {
+                subCatVal = (subSelect.value === 'その他') ? (document.getElementById('v_sub_other')?.value.trim() || 'その他') : subSelect.value;
+            }
+
+            if (currentCatId === 'schedule') {
+                const task = document.getElementById('v_task_todo').value;
+                if (!task) return alert("予定内容を入力してください");
+                const sel = document.getElementById('todo-date-sel').value;
+                const hasTime = document.getElementById('todo-has-time').checked;
+                const exactTime = hasTime ? document.getElementById('todo-exact-time').value : null;
+
+                const targetDate = (sel === 'today') ? date : new Date(new Date(date).setDate(new Date(date).getDate() + 1)).toISOString().split('T')[0];
+                window.dbData.todos.push({ id: Date.now(), time: exactTime, task, memo, done: false, date: targetDate, photo: currentRecPhotoData });
+            } else {
+                if (currentCatId === 'run') {
+                    val = parseFloat(document.getElementById('v_dist')?.value || 0);
+                    const hrs = parseFloat(document.getElementById('v_hrs')?.value || 0);
+                    const mins = parseFloat(document.getElementById('v_mins')?.value || 0);
+                    durationMin = Math.round(hrs * 60 + mins);
+                } else if (cat && cat.type === 'time') {
+                    val = parseFloat(document.getElementById('v_hrs')?.value || 0) + (parseFloat(document.getElementById('v_mins')?.value || 0) / 60);
+                    durationMin = Math.round(val * 60);
+                } else if (currentCatId === 'sleep') {
+                    const s = new Date(document.getElementById('sleep_s_date').value + 'T' + document.getElementById('sleep_s_time').value);
+                    const e = new Date(document.getElementById('sleep_e_date').value + 'T' + document.getElementById('sleep_e_time').value);
+                    val = (e - s) / 3600000; if (val < 0) val += 24;
+                    durationMin = Math.round(val * 60);
+                } else if (currentCatId === 'diary') {
+                    val = memo.length;
+                } else {
+                    val = parseFloat(document.getElementById('v1')?.value || 0);
+                }
+                
+                if (currentCatId === 'weight') window.dbData.user.weight = val;
+
+                let mainValStr = `${val.toFixed(1)} ${cat ? cat.unit : ''}`;
+                if (currentCatId === 'run') {
+                    mainValStr = `${val.toFixed(1)} km (${durationMin}分)`;
+                } else if (cat && cat.type === 'time') {
+                    mainValStr = formatTime(val);
+                }
+
+                const post = {
+                    id: Date.now(),
+                    catId: currentCatId,
+                    catName: cat ? cat.name : "記録",
+                    catIcon: cat ? cat.icon : "bi-pencil-square",
+                    catUnit: cat ? cat.unit : "",
+                    catType: cat ? cat.type : "val",
+                    subCategory: subCatVal,
+                    val: val,
+                    durationMin: durationMin,
+                    valDisp: subCatVal ? `[${subCatVal}] ${mainValStr}` : mainValStr,
+                    date: date,
+                    time: time,
+                    comment: memo,
+                    photo: currentRecPhotoData,
+                    userId: window.dbData.user.id,
+                    userName: window.dbData.user.name,
+                    userAvatar: window.dbData.user.avatar,
+                    groupCode: window.dbData.user.groupCode || null,
+                    isCustom: cat ? !!cat.isCustom : false
+                };
+
+                window.dbData.records.unshift(post);
+
+                if (window.cloud && window.cloud.postTimeline) {
+                    await window.cloud.postTimeline(post);
+                }
+            }
+
+            saveLocal();
+            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            }
+
+            closeInput();
+            alert("保存・同期完了！");
+        }
+
+        function saveLocal() {
+            localStorage.setItem('sz_v11_db', JSON.stringify(window.dbData));
+            renderAll();
+        }
+
+        function renderAll() {
+            const today = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
+            
+            const todoContainer = document.getElementById('todo-display-list');
+            if (todoContainer) {
+                todoContainer.innerHTML = `
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">TODAY (${today})</p>
+                    ${window.dbData.todos.filter(t => t.date === today).map(t => `
+                        <div class="flex items-start gap-3 p-3 bg-white/40 dark:bg-white/5 rounded-xl shadow-sm">
+                            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})" class="mt-1">
+                            <div>
+                                <p class="todo-title ${t.done ? 'todo-checked' : ''}">
+                                    ${t.time ? `<span class="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full mr-1.5">${t.time}</span>` : ''}
+                                    ${t.task}
+                                </p>
+                                ${t.memo ? `<p class="todo-memo">${t.memo}</p>` : ''}
+                                ${t.photo ? `<img src="${t.photo}" onclick="openImageModal('${t.photo}')" class="w-16 h-16 rounded-lg object-cover mt-1 cursor-pointer">` : ''}
+                            </div>
+                        </div>
+                    `).join('') || '<p class="text-center text-xs opacity-30 py-2">今日の予定はありません</p>'}
+
+                    <p class="text-[10px] font-bold text-gray-400 mt-4 uppercase tracking-wider">TOMORROW (${tomorrow})</p>
+                    ${window.dbData.todos.filter(t => t.date === tomorrow).map(t => `
+                        <div class="p-3 bg-white/10 rounded-xl opacity-60">
+                            <p class="todo-title">
+                                ${t.time ? `<span class="text-[10px] font-bold bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full mr-1.5">${t.time}</span>` : ''}
+                                ${t.task}
+                            </p>
+                        </div>
+                    `).join('') || '<p class="text-center text-xs opacity-30 py-2">明日の予定はありません</p>'}
+                `;
+            }
+        }
+
+        function renderCategories() {
+            const grid = document.getElementById('category-grid');
+            const allCats = [...baseCats, ...(window.dbData.cats || [])];
+            if (grid) {
+                grid.innerHTML = allCats.map(c => `
+                    <button onclick="openInput('${c.id}')" class="glass-card p-3 flex flex-col items-center hover:scale-105 transition">
+                        <i class="${c.icon} text-lg mb-1" style="color:${c.color}"></i>
+                        <span class="text-[9px] font-bold">${c.name}</span>
+                    </button>
+                `).join('');
+            }
+        }
+
+        function renderTimeline() {
+            const list = document.getElementById('feed-list');
+            const banner = document.getElementById('tl-group-banner');
+            const u = window.dbData.user;
+
+            if (banner) {
+                banner.innerHTML = `
+                    <button onclick="setTLFilter('global')" class="chip ${currentTLFilter === 'global' ? 'active' : ''}">🌐 Global</button>
+                    ${u.groupCode ? `<button onclick="setTLFilter('${u.groupCode}')" class="chip ${currentTLFilter === u.groupCode ? 'active' : ''}">👥 ${u.groupName || 'グループ'} (${u.groupCode})</button>` : ''}
+                `;
+            }
+
+            if (!list) return;
+
+            let filteredPosts = window.allPosts || [];
+            if (currentTLFilter !== 'global') {
+                filteredPosts = filteredPosts.filter(p => p.groupCode === currentTLFilter);
+            }
+
+            if (filteredPosts.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400 text-xs py-8">投稿がありません</p>`;
+                return;
+            }
+
+            list.innerHTML = filteredPosts.map(p => `
+                <div class="glass-card p-4 text-left shadow-sm">
+                    <div class="flex items-center gap-2 mb-2">
+                        <img src="${p.userAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.userName || 'User')}" class="w-6 h-6 rounded-full object-cover">
+                        <p class="text-[10px] font-bold text-blue-600 uppercase">${p.catName || '記録'}・${p.userName || '匿名'}</p>
+                    </div>
+                    <p class="todo-title">${p.valDisp}</p>
+                    ${p.comment ? `<p class="text-[11px] opacity-80 mt-1">${p.comment}</p>` : ''}
+                    ${p.photo ? `<img src="${p.photo}" onclick="openImageModal('${p.photo}')" class="w-24 h-24 rounded-xl object-cover mt-2 cursor-pointer border border-black/10 hover:opacity-90 transition">` : ''}
+                    <p class="text-[8px] text-gray-400 mt-2">${p.date || ''} ${p.time || ''}</p>
+                </div>
+            `).join('');
+        }
+
+        function setTLFilter(scope) {
+            currentTLFilter = scope;
+            renderTimeline();
+        }
+
+        function renderIconPicker() {
+            const picker = document.getElementById('icon-picker');
+            if (picker) {
+                picker.innerHTML = presetIcons.map(icon => `
+                    <button type="button" onclick="selectIcon('${icon}')" class="p-3 rounded-xl flex items-center justify-center border ${selectedIcon === icon ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200'}">
+                        <i class="${icon} text-lg"></i>
+                    </button>
+                `).join('');
+            }
+        }
+
+        function selectIcon(icon) { selectedIcon = icon; renderIconPicker(); }
+        function toggleCustomUnit(val) { document.getElementById('custom-unit-box').classList.toggle('hidden', val !== 'custom'); }
+
+        function createCustomCategory() {
+            const name = document.getElementById('new-cat-name').value.trim();
+            if (!name) return alert("カテゴリー名を入力してください");
+
+            const unitType = document.getElementById('new-cat-unit-type').value;
+            let unit = unitType, type = 'val';
+
+            if (unitType === 'time') { unit = '時間'; type = 'time'; }
+            else if (unitType === 'custom') { unit = document.getElementById('new-cat-custom-unit').value.trim() || '回'; }
+
+            const newCat = { 
+                id: 'custom_' + Date.now(), 
+                name, 
+                icon: selectedIcon, 
+                color: '#0071e3', 
+                type, 
+                unit,
+                isCustom: true,
+                createdBy: window.dbData.user.id,
+                groupCode: window.dbData.user.groupCode || null
+            };
+
+            window.dbData.cats = window.dbData.cats || [];
+            window.dbData.cats.push(newCat);
+
+            saveLocal();
+            renderCategories();
+            showSection('home');
+            alert(`カテゴリー「${name}」を追加しました！`);
+        }
+
+        async function handleCreateGroup() {
+            const name = prompt("グループ名を入力してください", "勉強グループ");
+            if (!name) return;
+            const res = await window.cloud.createGroup(name, window.dbData.user);
+            window.dbData.user.groupCode = res.code;
+            window.dbData.user.groupName = res.name;
+            saveLocal();
+            if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            renderProfilePage();
+            alert(`グループを作成しました！\n招待コード: ${res.code}`);
+        }
+
+        async function handleJoinGroup() {
+            const code = prompt("6桁の招待コードを入力してください");
+            if (!code) return;
+            const res = await window.cloud.joinGroup(code, window.dbData.user);
+            if (res.success) {
+                window.dbData.user.groupCode = code.toUpperCase();
+                window.dbData.user.groupName = res.group.name;
+                saveLocal();
+                if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                renderProfilePage();
+                alert(`グループ「${res.group.name}」に参加しました！`);
+            } else {
+                alert(res.msg);
+            }
+        }
+
+        function renderResultsView() {
+            const date = document.getElementById('results-date').value;
+            const prev = new Date(new Date(date).setDate(new Date(date).getDate() - 1)).toISOString().split('T')[0];
+            const all = [...baseCats, ...(window.dbData.cats || [])];
+            
+            const grid = document.getElementById('result-sum-grid');
+            if (grid) {
+                grid.innerHTML = all.filter(c => c.type !== 'todo').map(c => {
+                    const curRecs = window.dbData.records.filter(r => r.date === date && r.catId === c.id);
+                    const cur = (c.id === 'weight') ? (curRecs[0]?.val || 0) : curRecs.reduce((s, a) => s + a.val, 0);
+                    const curMins = curRecs.reduce((s, a) => s + (a.durationMin || 0), 0);
+                    
+                    const oldRecs = window.dbData.records.filter(r => r.date === prev && r.catId === c.id);
+                    const old = (c.id === 'weight') ? (oldRecs[0]?.val || 0) : oldRecs.reduce((s, a) => s + a.val, 0);
+                    const diff = cur - old;
+                    
+                    let valDisp = '';
+                    if (c.id === 'run') {
+                        valDisp = `${cur.toFixed(1)} km <span class="text-[10px] text-gray-500 font-normal ml-0.5">(${curMins}分)</span>`;
+                    } else if (c.type === 'time' || c.type === 'sleep') {
+                        valDisp = formatTime(cur);
+                    } else if (c.type === 'diary') {
+                        valDisp = `${cur}文字`;
+                    } else {
+                        valDisp = `${cur.toFixed(1)} ${c.unit}`;
+                    }
+
+                    const diffH = cur === 0 ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
+                    
+                    return cur > 0 ? `
+                        <div class="glass-card p-3 text-center">
+                            <p class="text-[8px] font-bold text-gray-400 uppercase">${c.name}</p>
+                            <p class="text-sm font-black text-blue-600">${valDisp}</p>
+                            ${diffH}
+                        </div>
+                    ` : '';
+                }).join('') || `<p class="col-span-2 text-center text-xs text-gray-400 py-4">この日の記録はありません</p>`;
+            }
+
+            const todoList = document.getElementById('result-todo-list');
+            if (todoList) {
+                todoList.innerHTML = window.dbData.todos.filter(t => t.date === date && t.done).map(t => `
+                    <div class="p-2 bg-green-50 dark:bg-green-900/20 text-[10px] rounded-lg text-green-700 dark:text-green-300 font-bold">✓ ${t.task}</div>
+                `).join('') || `<p class="text-center text-xs text-gray-400">達成した予定はありません</p>`;
+            }
+        }
+
+        function toggleTodo(id) {
+            const t = window.dbData.todos.find(x => x.id === id);
+            if (t) {
+                t.done = !t.done;
+                saveLocal();
+                if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
+                    window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                }
+            }
+        }
+
+        function updatePreCal() {
+            const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
