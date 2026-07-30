@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.-1 Complete</title>
+    <title>Satoz Diary Ver. α.-1 Refined</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -30,7 +30,6 @@
         .chip { white-space: nowrap; font-size: 10px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(120,120,120,0.1); cursor: pointer; }
         .chip.active { background: var(--apple-accent); color: white; }
         .todo-title { font-size: 13px; font-weight: 700; }
-        .todo-memo { font-size: 10px; font-weight: 500; color: #0071e3; }
         .todo-checked { opacity: 0.4; text-decoration: line-through; }
         .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
         .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
@@ -39,13 +38,13 @@
 </head>
 <body>
 
-    <!-- 写真拡大表示用モーダル -->
+    <!-- 写真拡大用モーダル -->
     <div id="image-modal" class="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4" onclick="window.closeImageModal()">
         <img id="image-modal-img" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
         <button class="absolute top-6 right-6 text-white text-3xl font-bold cursor-pointer">×</button>
     </div>
 
-    <!-- 🌟 ふわっと浮き出る記録・予定入力モーダル -->
+    <!-- 浮き出る記録・予定入力モーダル -->
     <div id="input-modal" class="fixed inset-0 z-[15000] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="glass-card modal-pop p-6 max-w-sm w-full shadow-2xl relative max-h-[90vh] overflow-y-auto border-2 border-blue-500/30">
             <div class="flex justify-between items-center mb-4">
@@ -74,7 +73,7 @@
             <textarea id="rec-comment" placeholder="一言メモ（任意）" rows="2" class="mt-4 w-full text-xs"></textarea>
             
             <div id="calorie-preview" class="hidden mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-200">
-                <p class="text-[10px] font-bold text-orange-500 uppercase">カロリー計算</p>
+                <p class="text-[10px] font-bold text-orange-500 uppercase">消費カロリー計算 (身長・体重・年齢連動)</p>
                 <p id="cal-val" class="text-lg font-black text-orange-700 dark:text-orange-300 text-center">0 kcal</p>
             </div>
             
@@ -125,7 +124,7 @@
                         <h2 class="font-bold text-xs text-gray-500 uppercase tracking-wider">スケジュール・予定</h2>
                         <div class="flex gap-1.5">
                             <button onclick="window.toggleTodoEditMode()" id="todo-edit-btn" class="text-[10px] bg-black/10 dark:bg-white/10 text-gray-700 dark:text-gray-200 px-2.5 py-1 rounded-full font-bold">✏️ 編集</button>
-                            <button onclick="window.openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-2.5 py-1 rounded-full font-bold">+ 予定追加</button>
+                            <button onclick="window.openInput('schedule')" class="text-[10px] bg-yellow-500 text-white px-2.5 py-1 rounded-full font-bold">予定追加</button>
                         </div>
                     </div>
                     <div id="todo-display-list" class="space-y-2"></div>
@@ -133,14 +132,14 @@
 
                 <div id="category-grid" class="grid grid-cols-4 gap-3 mb-6"></div>
 
-                <!-- 復活：＋ カテゴリー追加ボタン -->
-                <button onclick="window.showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-blue-600 border-dashed border-2 border-blue-500/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition flex items-center justify-center gap-2 mb-6">
+                <!-- スタイリッシュな「カテゴリー追加」ボタン (プラス文字を排除) -->
+                <button onclick="window.showSection('cat-maker')" class="w-full glass-card p-4 text-xs font-bold text-blue-600 border-dashed border-2 border-blue-500/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition flex items-center justify-center gap-2 mb-6 shadow-sm">
                     <i class="bi bi-plus-circle-fill text-lg"></i>
-                    <span>＋ カテゴリー追加</span>
+                    <span>カテゴリー追加</span>
                 </button>
             </section>
 
-            <!-- カテゴリー追加画面 -->
+            <!-- カテゴリー追加画面 (完全復元版) -->
             <section id="cat-maker" class="view-section">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black italic">カテゴリー追加</h2>
@@ -149,13 +148,29 @@
                 <div class="glass-card p-6 space-y-4">
                     <div>
                         <label class="text-[10px] font-bold text-gray-400 uppercase">カテゴリー名</label>
-                        <input type="text" id="new-cat-name" placeholder="例: 読書, 薬, ピアノ" class="w-full mt-1">
+                        <input type="text" id="new-cat-name" placeholder="例: 読書, 薬, ピアノ" class="w-full mt-1 text-xs">
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">単位</label>
-                        <input type="text" id="new-cat-unit" placeholder="例: 時間, 回, 錠" class="w-full mt-1">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-2 block">アイコン選択</label>
+                        <div id="icon-picker" class="grid grid-cols-6 gap-2"></div>
                     </div>
-                    <button onclick="window.createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4">カテゴリーを作成</button>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">単位の選択</label>
+                        <select id="new-cat-unit-type" class="w-full mt-1 text-xs" onchange="window.toggleCustomUnit(this.value)">
+                            <option value="time">時間 (h / m 分割入力)</option>
+                            <option value="kcal">カロリー (kcal)</option>
+                            <option value="kg">重量・体重 (kg)</option>
+                            <option value="km">距離 (km)</option>
+                            <option value="文字">文字数 (文字)</option>
+                            <option value="回">回数 (回)</option>
+                            <option value="custom">その他 (自由入力)</option>
+                        </select>
+                    </div>
+                    <div id="custom-unit-box" class="hidden">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">単位を入力</label>
+                        <input type="text" id="new-cat-custom-unit" placeholder="例: 錠, ページ, ml" class="w-full mt-1 text-xs">
+                    </div>
+                    <button onclick="window.createCustomCategory()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">カテゴリーを作成</button>
                 </div>
             </section>
 
@@ -296,7 +311,7 @@
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
             { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
             { 
-                id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間', mets:2.0,
+                id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間',
                 subOptions: ['国語', '数学', '物理', '化学', '英語', '情報', 'その他'] 
             },
             { 
@@ -305,8 +320,11 @@
             },
             { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
             { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
-            { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間', mets:0.9 }
+            { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間' }
         ];
+
+        const presetIcons = ['bi-book', 'bi-fire', 'bi-person-walking', 'bi-speedometer2', 'bi-chat-quote', 'bi-moon-stars', 'bi-cup-hot', 'bi-heart-pulse', 'bi-controller', 'bi-music-note', 'bi-droplet', 'bi-capsule', 'bi-star-fill', 'bi-trophy', 'bi-bicycle'];
+        let selectedIcon = presetIcons[0];
 
         // Firebase Cloud Methods
         window.cloud = {
@@ -360,9 +378,7 @@
             },
             // 🌟 タイムライン投稿の完全削除（データベース抹消）
             deleteTimelinePost: async (docId) => {
-                try {
-                    await deleteDoc(doc(db, "timeline", docId));
-                } catch(e) { console.error("削除エラー:", e); }
+                await deleteDoc(doc(db, "timeline", docId));
             },
             createGroup: async (groupName, user) => {
                 const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -397,6 +413,7 @@
             if (document.getElementById('results-date')) document.getElementById('results-date').value = new Date().toISOString().split('T')[0];
             if (document.getElementById('rank-date')) document.getElementById('rank-date').value = new Date().toISOString().split('T')[0];
 
+            window.renderIconPicker();
             window.renderCategories();
             window.renderAll();
             window.renderResultsView();
@@ -453,7 +470,7 @@
             document.getElementById('image-modal').classList.add('hidden');
         };
 
-        // 🌟 入力画面：ふわっと浮き出るモーダルオープン
+        // 🌟 入力ダイアログ制御 (カロリー計算は運動系のみ連動)
         window.openInput = function(id) {
             window.currentCatId = id;
             window.clearRecPhoto();
@@ -495,14 +512,14 @@
                         <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
                         <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="window.updatePreCal()"><span>m</span>
                     </div>`;
-                document.getElementById('calorie-preview').classList.remove('hidden');
+                window.updatePreCal();
             } else if (cat && cat.type === 'time') {
                 fields.innerHTML += `
                     <div class="flex gap-2 justify-center items-center">
                         <input type="number" id="v_hrs" placeholder="時" class="val-input"><span>h</span>
                         <input type="number" id="v_mins" placeholder="分" class="val-input" oninput="window.updatePreCal()"><span>m</span>
                     </div>`;
-                if (cat.mets) document.getElementById('calorie-preview').classList.remove('hidden');
+                if (cat.mets) window.updatePreCal();
             } else if (id === 'sleep') {
                 fields.innerHTML += `
                     <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
@@ -616,7 +633,6 @@
             window.renderAll();
         };
 
-        // ✏️ 予定の編集モードトグル
         window.toggleTodoEditMode = function() {
             window.isTodoEditMode = !window.isTodoEditMode;
             const btn = document.getElementById('todo-edit-btn');
@@ -628,7 +644,6 @@
             window.renderAll();
         };
 
-        // ✏️ 予定の並び替え (順番入れ替え)
         window.moveTodo = function(id, direction) {
             const index = window.dbData.todos.findIndex(t => t.id === id);
             if (index < 0) return;
@@ -645,7 +660,6 @@
             }
         };
 
-        // 🗑️ 予定の削除
         window.deleteTodo = function(id) {
             if (!confirm("この予定を完全に削除しますか？")) return;
             window.dbData.todos = window.dbData.todos.filter(t => t.id !== id);
@@ -655,7 +669,6 @@
             }
         };
 
-        // 📅 予定一覧のスリムレンダー (スケジュール風)
         window.renderAll = function() {
             const today = new Date().toISOString().split('T')[0];
             const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
@@ -704,7 +717,7 @@
             }
         };
 
-        // 🌟 タイムライン (削除機能付き ➔ Firestore完全抹消)
+        // 🌟 タイムライン描画 (削除ボタンの完全修正)
         window.renderTimeline = function() {
             const list = document.getElementById('feed-list');
             const banner = document.getElementById('tl-group-banner');
@@ -733,7 +746,8 @@
                 const likes = p.likes || [];
                 const comments = p.comments || [];
                 const isLiked = likes.includes(u.id);
-                const isMyPost = p.userId === u.id;
+                // 自分の投稿判定（UID一致またはユーザー名一致）
+                const isMyPost = (p.userId === u.id) || (p.userName === u.name);
 
                 return `
                 <div class="glass-card p-4 text-left shadow-sm relative">
@@ -778,11 +792,20 @@
             `;}).join('');
         };
 
-        // 🗑️ タイムライン削除実行
+        // 🗑️ タイムライン投稿の完全削除（データベース抹消）
         window.handleDeletePost = async function(docId) {
-            if (!confirm("この投稿を削除しますか？\n（データベースから完全に消去されます）")) return;
-            await window.cloud.deleteTimelinePost(docId);
-            alert("削除が完了しました！");
+            if (!docId) return alert("削除エラー: 投稿IDが見つかりません");
+            if (!confirm("この投稿を完全に削除しますか？\n（データベースから抹消されます）")) return;
+
+            try {
+                await window.cloud.deleteTimelinePost(docId);
+                window.allPosts = window.allPosts.filter(p => p.docId !== docId);
+                window.renderTimeline();
+                alert("投稿を削除しました。");
+            } catch(e) {
+                console.error("Delete failed:", e);
+                alert("削除に失敗しました: " + e.message);
+            }
         };
 
         window.handleToggleLike = async function(docId) {
@@ -815,18 +838,39 @@
             window.renderTimeline();
         };
 
+        // 🌟 カテゴリー追加ピッカー ＆ 単位選択機能の完全復元
+        window.renderIconPicker = function() {
+            const picker = document.getElementById('icon-picker');
+            if (picker) {
+                picker.innerHTML = presetIcons.map(icon => `
+                    <button type="button" onclick="window.selectIcon('${icon}')" class="p-3 rounded-xl flex items-center justify-center border ${selectedIcon === icon ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200'}">
+                        <i class="${icon} text-lg"></i>
+                    </button>
+                `).join('');
+            }
+        };
+
+        window.selectIcon = function(icon) { selectedIcon = icon; window.renderIconPicker(); };
+        window.toggleCustomUnit = function(val) { document.getElementById('custom-unit-box').classList.toggle('hidden', val !== 'custom'); };
+
         window.createCustomCategory = function() {
             const name = document.getElementById('new-cat-name').value.trim();
-            const unit = document.getElementById('new-cat-unit').value.trim() || '回';
             if (!name) return alert("カテゴリー名を入力してください");
 
-            const newCat = {
-                id: 'custom_' + Date.now(),
-                name,
-                icon: 'bi-star-fill',
-                color: '#0071e3',
-                type: 'val',
-                unit
+            const unitType = document.getElementById('new-cat-unit-type').value;
+            let unit = unitType, type = 'val';
+
+            if (unitType === 'time') { unit = '時間'; type = 'time'; }
+            else if (unitType === 'custom') { unit = document.getElementById('new-cat-custom-unit').value.trim() || '回'; }
+
+            const newCat = { 
+                id: 'custom_' + Date.now(), 
+                name, 
+                icon: selectedIcon, 
+                color: '#0071e3', 
+                type, 
+                unit,
+                isCustom: true
             };
 
             window.dbData.cats = window.dbData.cats || [];
@@ -835,7 +879,7 @@
             window.saveLocal();
             window.renderCategories();
             window.showSection('home');
-            alert(`カテゴリー「${name}」を追加しました！`);
+            alert(`カテゴリー「${name}」を作成しました！`);
         };
 
         window.handleCreateGroup = async function() {
@@ -866,7 +910,6 @@
             }
         };
 
-        // 🏃 Results 画面 (時間表記を (0h 45m) に統一)
         window.renderResultsView = function() {
             const date = document.getElementById('results-date').value;
             const prev = new Date(new Date(date).setDate(new Date(date).getDate() - 1)).toISOString().split('T')[0];
@@ -925,13 +968,20 @@
             }
         };
 
+        // 🌟 カロリー計算 (身長・体重・年齢プロフ連動)
         window.updatePreCal = function() {
             const h = parseFloat(document.getElementById('v_hrs')?.value || 0);
             const m = parseFloat(document.getElementById('v_mins')?.value || 0);
+            const totalHours = h + (m / 60);
             const cat = baseCats.find(c => c.id === window.currentCatId);
-            if (cat && cat.mets) {
-                const cal = Math.round(cat.mets * (window.dbData.user.weight || 65) * (h + m / 60) * 1.05);
+            
+            if (cat && cat.mets && totalHours > 0) {
+                const w = window.dbData.user.weight || 65;
+                const cal = Math.round(cat.mets * w * totalHours * 1.05);
                 document.getElementById('cal-val').innerText = `${cal} kcal`;
+                document.getElementById('calorie-preview').classList.remove('hidden');
+            } else {
+                document.getElementById('calorie-preview').classList.add('hidden');
             }
         };
 
