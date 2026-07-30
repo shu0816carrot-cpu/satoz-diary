@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.8</title>
+    <title>Satoz Diary Ver. α.9</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -126,7 +126,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.8</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.9</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -149,7 +149,10 @@
     <!-- 2. アプリ本体 -->
     <div id="app-shell" style="display:none;">
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
-            <h1 class="text-lg font-black italic text-blue-600 tracking-tighter cursor-pointer" onclick="window.showSection('home')">Satoz Diary</h1>
+            <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
+                <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.9</span>
+            </div>
             <div class="flex items-center gap-2">
                 <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
                 <button onclick="window.showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
@@ -216,7 +219,7 @@
                 </div>
             </section>
 
-            <!-- Timeline -->
+            <!-- Timeline (広場) -->
             <section id="timeline" class="view-section">
                 <div class="mb-4">
                     <h2 class="text-xl font-black mb-2 italic">Timeline</h2>
@@ -300,7 +303,6 @@
             <section id="settings" class="view-section">
                 <h2 class="text-xl font-bold mb-4 text-center">Settings</h2>
                 
-                <!-- Google連携インジケーター -->
                 <div id="google-auth-badge" class="glass-card p-3 mb-4 flex items-center justify-between border border-blue-500/30 bg-blue-50/40 dark:bg-blue-900/20">
                     <div class="flex items-center gap-2">
                         <i class="bi bi-google text-blue-600 text-base"></i>
@@ -345,16 +347,16 @@
                             <input type="number" id="set-age" class="w-full mt-1">
                         </div>
                     </div>
-                    <button onclick="window.saveSettings()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">Satoz Diary 設定を更新保存</button>
-                    <button onclick="window.cloud.logout()" class="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl mt-2 text-xs">ログアウト</button>
+                    <button onclick="window.saveSettings()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg mt-4 active:scale-95 transition">Satoz Diary 設定を更新保存</button>
+                    <button onclick="window.handleLogout()" class="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold py-3 rounded-2xl mt-2 text-xs">ログアウト</button>
                 </div>
             </section>
         </main>
 
-        <!-- タブバー -->
+        <!-- タブバー (TL -> 広場) -->
         <nav class="tab-bar">
             <button onclick="window.showSection('home')" class="nav-item active"><i class="bi bi-pencil-square text-lg"></i><div>記録</div></button>
-            <button onclick="window.showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>TL</div></button>
+            <button onclick="window.showSection('timeline')" class="nav-item"><i class="bi bi-chat-dots text-lg"></i><div>広場</div></button>
             <button onclick="window.showSection('results')" class="nav-item"><i class="bi bi-journal-check text-lg"></i><div>結果</div></button>
             <button onclick="window.showSection('ranking')" class="nav-item"><i class="bi bi-bar-chart-fill text-lg"></i><div>順位</div></button>
             <button onclick="window.showSection('profile')" class="nav-item"><i class="bi bi-person-circle text-lg"></i><div>本人</div></button>
@@ -466,10 +468,14 @@
                     }
                 }
             },
-            logout: () => auth ? signOut(auth) : window.location.reload(),
+            logout: async () => {
+                localStorage.removeItem('sz_v11_db');
+                if (auth) await signOut(auth);
+                window.location.reload();
+            },
             saveAllUserData: async (uid, data) => {
                 if (window.isDemoMode || !db) return;
-                try { await setDoc(doc(db, "users", uid), data, { merge: true }); } catch(e) { console.error(e); }
+                try { await setDoc(doc(db, "users", uid), data, { merge: true }); } catch(e) { console.error("Firebase Sync Fail:", e); }
             },
             getUserData: async (uid) => {
                 if (window.isDemoMode || !db) return null;
@@ -537,6 +543,11 @@
                     return snap.docs.map(doc => doc.data());
                 } catch(e) { console.error(e); return []; }
             }
+        };
+
+        window.handleLogout = async function() {
+            if (!confirm("ログアウトしてログイン画面に戻りますか？")) return;
+            await window.cloud.logout();
         };
 
         window.initApp = function() {
@@ -771,8 +782,9 @@
             }
 
             window.saveLocal();
-            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+            if (window.cloud && window.cloud.saveAllUserData) {
+                await window.cloud.saveAllUserData(googleUid, window.dbData);
             }
 
             window.closeInput();
@@ -806,8 +818,9 @@
             window.dbData.todos[targetIndex] = temp;
 
             window.saveLocal();
-            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+            if (window.cloud && window.cloud.saveAllUserData) {
+                window.cloud.saveAllUserData(googleUid, window.dbData);
             }
         };
 
@@ -815,8 +828,9 @@
             if (!confirm("この予定を完全に削除しますか？")) return;
             window.dbData.todos = window.dbData.todos.filter(t => t.id !== id);
             window.saveLocal();
-            if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+            if (window.cloud && window.cloud.saveAllUserData) {
+                window.cloud.saveAllUserData(googleUid, window.dbData);
             }
         };
 
@@ -1087,7 +1101,8 @@
             }
 
             window.saveLocal();
-            if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+            if (window.cloud && window.cloud.saveAllUserData) await window.cloud.saveAllUserData(googleUid, window.dbData);
             window.renderProfilePage();
             alert(`グループを作成しました！\n招待コード: ${res.code}`);
         };
@@ -1104,7 +1119,8 @@
                 }
 
                 window.saveLocal();
-                if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+                if (window.cloud && window.cloud.saveAllUserData) await window.cloud.saveAllUserData(googleUid, window.dbData);
                 window.renderProfilePage();
                 alert(`グループ「${res.group.name}」に参加しました！`);
             } else {
@@ -1120,7 +1136,8 @@
 
             window.dbData.user.groups = (window.dbData.user.groups || []).filter(g => g.code !== groupCode);
             window.saveLocal();
-            if (window.cloud.saveAllUserData) await window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+            const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+            if (window.cloud && window.cloud.saveAllUserData) await window.cloud.saveAllUserData(googleUid, window.dbData);
             
             window.renderProfilePage();
             window.renderTimeline();
@@ -1236,8 +1253,9 @@
             if (t) {
                 t.done = !t.done;
                 window.saveLocal();
-                if (window.cloud && window.cloud.saveAllUserData && window.dbData.user.id) {
-                    window.cloud.saveAllUserData(window.dbData.user.id, window.dbData);
+                const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
+                if (window.cloud && window.cloud.saveAllUserData) {
+                    window.cloud.saveAllUserData(googleUid, window.dbData);
                 }
             }
         };
@@ -1294,7 +1312,7 @@
             return h > 0 ? `${h}h ${m}m` : `${m}m`;
         };
 
-        // 🌟 Satoz Diary アカウント設定の個別更新保存
+        // 🌟 Satoz Diary アカウント設定のFirebase直接保存送信 ＆ 通知
         window.saveSettings = async function() {
             const newName = document.getElementById('set-name').value.trim();
             const newId = document.getElementById('set-id').value.trim();
@@ -1310,7 +1328,7 @@
             
             window.saveLocal();
             
-            // クラウド同期 (Google UIDのキーの配下にSatoz Diary設定を書き込む)
+            // 投稿・記録と同じ扱いで、Firebaseクラウドに確実に直接データを送信保存！
             const googleUid = auth && auth.currentUser ? auth.currentUser.uid : window.dbData.user.id;
             if (window.cloud && window.cloud.saveAllUserData) {
                 await window.cloud.saveAllUserData(googleUid, window.dbData);
@@ -1318,7 +1336,9 @@
 
             window.renderProfilePage();
             window.renderTimeline();
-            alert("Satoz Diary アカウント設定を更新・保存しました！");
+            
+            // ポップアップ表示
+            alert("保存しました！\n（FirebaseデータベースにSatoz Diaryのアカウント設定を同期・保存しました）");
         };
 
         window.handleAvatarFileSelect = function(e) {
@@ -1475,7 +1495,6 @@
             window.updateRankList(window.rankCatId);
         };
 
-        // 📱 スマホ画面復帰（スリープ解除・アプリ復帰）時の自動同期再開
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {
                 if (window.cloud && window.cloud.listenTimeline) {
@@ -1498,7 +1517,6 @@
                     const emailDisp = document.getElementById('google-email-disp');
                     if (emailDisp) emailDisp.innerText = user.email || user.displayName || "Google連携済";
 
-                    // 初回のみGoogleの初期値を入れるが、Satoz Diary設定があればそれを最優先適用！
                     if (!window.dbData.user.name || window.dbData.user.name === "Guest") {
                         window.dbData.user.name = user.displayName || "User";
                     }
