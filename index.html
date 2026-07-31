@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.16</title>
+    <title>Satoz Diary Ver. α.18</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -74,7 +74,6 @@
         (function() {
             try {
                 const localDb = JSON.parse(localStorage.getItem('sz_v11_db') || '{}');
-                const activeTab = localStorage.getItem('sz_active_tab') || 'home';
                 let style = '';
                 if (localDb.user && localDb.user.id) {
                     style += '#login-screen{display:none !important;} #app-shell{display:block !important;}';
@@ -172,7 +171,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.16</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.18</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -197,17 +196,16 @@
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
                 <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.16</span>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.18</span>
             </div>
             
-            <!-- 🌟 位置入れ替え：[通知ボタン] → [時計] → [設定] -->
             <div class="flex items-center gap-2">
+                <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
+
                 <button onclick="window.toggleNotifyModal()" class="relative w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="通知">
                     <i class="bi bi-bell-fill"></i>
                     <span id="notify-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow">0</span>
                 </button>
-
-                <div id="realtime-clock" class="text-xs font-bold px-3 py-1.5 bg-black/5 dark:bg-white/10 rounded-full">00:00:00</div>
 
                 <button onclick="window.showSection('settings')" class="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 active:scale-95 transition" title="設定">
                     <i class="bi bi-gear-fill text-sm"></i>
@@ -337,9 +335,50 @@
                 </div>
             </section>
 
-            <!-- Profile ＆ グループ -->
+            <!-- Profile (本人 ＆ 24時間円グラフ ＆ カテゴリー別棒グラフ) -->
             <section id="profile" class="view-section">
                 <div id="profile-header-area"></div>
+
+                <!-- 🌟 24時間 1日あたり平均活用時間 円グラフ -->
+                <div class="glass-card p-5 mb-6 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-xs font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+                                <i class="bi bi-pie-chart-fill text-base"></i>
+                                <span>24時間 平均活用グラフ</span>
+                            </h3>
+                            <p id="pie-sub-label" class="text-[8px] text-gray-400 font-bold mt-0.5">※1日あたりの平均時間を集計</p>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="window.setPieFilter('1d')" id="pie-f-1d" class="chip py-1 px-2.5 text-[9px] active">1日</button>
+                            <button onclick="window.setPieFilter('1w')" id="pie-f-1w" class="chip py-1 px-2.5 text-[9px]">1週間</button>
+                            <button onclick="window.setPieFilter('1m')" id="pie-f-1m" class="chip py-1 px-2.5 text-[9px]">1ヶ月</button>
+                            <button onclick="window.setPieFilter('1y')" id="pie-f-1y" class="chip py-1 px-2.5 text-[9px]">1年間</button>
+                        </div>
+                    </div>
+                    <div class="relative w-48 h-48 mx-auto flex items-center justify-center">
+                        <canvas id="profile-pie-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 🌟 カテゴリー別 棒グラフ（1週間:7本 / 1ヶ月:週別 / 半年:6本） -->
+                <div class="glass-card p-5 mb-6 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <button onclick="window.slideBarCat(-1)" class="w-6 h-6 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center font-bold text-xs">⟨</button>
+                            <h3 id="bar-cat-title" class="text-xs font-bold text-blue-600 uppercase tracking-wider">カテゴリー推移</h3>
+                            <button onclick="window.slideBarCat(1)" class="w-6 h-6 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center font-bold text-xs">⟩</button>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="window.setBarSpan('1w')" id="bar-s-1w" class="chip py-1 px-2.5 text-[9px] active">1週間</button>
+                            <button onclick="window.setBarSpan('1m')" id="bar-s-1m" class="chip py-1 px-2.5 text-[9px]">1ヶ月</button>
+                            <button onclick="window.setBarSpan('6m')" id="bar-s-6m" class="chip py-1 px-2.5 text-[9px]">半年</button>
+                        </div>
+                    </div>
+                    <div class="w-full h-44">
+                        <canvas id="profile-bar-chart"></canvas>
+                    </div>
+                </div>
 
                 <div class="glass-card p-5 mb-6 space-y-4 border-2 border-blue-500/20">
                     <h3 class="text-xs font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
@@ -477,8 +516,14 @@
         window.cropper = null;
         window.currentCropTarget = null;
 
+        window.pieFilterSpan = '1d';
+        window.barFilterSpan = '1w';
+        window.barCatIndex = 0;
+        window.pieChartInstance = null;
+        window.barChartInstance = null;
+
         const baseCats = [
-            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444', type:'weight', unit:'kg' },
+            { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444444', type:'weight', unit:'kg' },
             { id:'meal', name:'食事', icon:'bi-egg-fried', color:'#34c759', type:'val', unit:'kcal' },
             { 
                 id:'study', name:'勉強', icon:'bi-book', color:'#0071e3', type:'time', unit:'時間',
@@ -489,7 +534,7 @@
                 subOptions: ['腹筋', '背筋', '腕立て伏せ', 'プランク', '機械', 'その他'] 
             },
             { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
-            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000', type:'diary', unit:'文字' },
+            { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000000', type:'diary', unit:'文字' },
             { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間' }
         ];
 
@@ -773,7 +818,6 @@
             window.renderResultsView();
             window.updateNotifyBadge();
             
-            // 🌟 タブ切替時のチラつきを解消（直前の保持タブを開く）
             const savedTab = localStorage.getItem('sz_active_tab') || 'home';
             window.showSection(savedTab);
 
@@ -807,19 +851,24 @@
             window.currentCatId = id;
             window.clearRecPhoto();
             const cat = [...baseCats, ...(window.dbData.cats || [])].find(c => c.id === id);
-            document.getElementById('input-modal').classList.remove('hidden');
-            document.getElementById('input-title').innerText = cat ? cat.name : "予定追加";
             
+            const modal = document.getElementById('input-modal');
+            if (modal) modal.classList.remove('hidden');
+
+            const title = document.getElementById('input-title');
+            if (title) title.innerText = cat ? cat.name : "予定追加";
+
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
             const timeStr = now.toTimeString().slice(0, 5);
 
-            document.getElementById('rec-date').value = todayStr;
-            document.getElementById('rec-time').value = timeStr;
+            if (document.getElementById('rec-date')) document.getElementById('rec-date').value = todayStr;
+            if (document.getElementById('rec-time')) document.getElementById('rec-time').value = timeStr;
             
             const fields = document.getElementById('dynamic-fields');
+            if (!fields) return;
             fields.innerHTML = '';
-            document.getElementById('calorie-preview').classList.add('hidden');
+            if (document.getElementById('calorie-preview')) document.getElementById('calorie-preview').classList.add('hidden');
 
             if (cat && cat.subOptions && cat.subOptions.length > 0) {
                 let subHtml = `<div><label class="text-[10px] font-bold text-gray-400 uppercase">項目・種目</label><select id="v_sub_cat" class="w-full mt-1 text-xs" onchange="window.toggleSubOther(this.value); window.updatePreCal();">`;
@@ -844,7 +893,6 @@
                     </div>
                 `;
             } else if (id === 'weight') {
-                // 🌟 体重：カッコ書き削除 ＆ 「詳細を記入する」色を標準化
                 fields.innerHTML += `
                     <label class="text-[10px] font-bold text-gray-400 uppercase">体重</label>
                     <div class="flex gap-2 items-center justify-center">
@@ -907,8 +955,7 @@
                     </div>`;
                 window.updatePreCal();
             } else if (id === 'sleep') {
-                // 🌟 睡眠：就寝日＝「前日」、起床日＝「当日(今日)」にデフォルト自動セット！
-                const yesterday = new Date(now.setDate(now.getDate() - 1)).toISOString().split('T')[0];
+                const yesterday = new Date(new Date().setDate(now.getDate() - 1)).toISOString().split('T')[0];
                 fields.innerHTML += `
                     <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
                         <div>就寝日<input type="date" id="sleep_s_date" value="${yesterday}" class="w-full mt-1 text-xs"></div>
@@ -1674,7 +1721,6 @@
             alert("保存しました！\n（Satoz Diaryのアカウント設定をFirebaseへ正常に同期・更新しました）");
         };
 
-        // 🌟 プロフィール（本人）タブのアイコン拡大表示（w-28 h-28）
         window.renderProfilePage = function() {
             const u = window.dbData.user;
             const area = document.getElementById('profile-header-area');
@@ -1704,6 +1750,203 @@
                     gList.innerHTML = `<p class="text-gray-400 text-xs">現在どのグループにも所属していません</p>`;
                 }
             }
+
+            window.renderProfilePieChart();
+            window.renderProfileBarChart();
+        };
+
+        // 🌟 ご要望通り「1日あたりの平均時間（24時間構成）」で円グラフを描画
+        window.setPieFilter = function(span) {
+            window.pieFilterSpan = span;
+            ['1d','1w','1m','1y'].forEach(s => {
+                const btn = document.getElementById(`pie-f-${s}`);
+                if (btn) btn.classList.toggle('active', s === span);
+            });
+            window.renderProfilePieChart();
+        };
+
+        window.renderProfilePieChart = function() {
+            const canvas = document.getElementById('profile-pie-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const now = new Date();
+            let daysLimit = 1;
+            if (window.pieFilterSpan === '1w') daysLimit = 7;
+            if (window.pieFilterSpan === '1m') daysLimit = 30;
+            if (window.pieFilterSpan === '1y') daysLimit = 365;
+
+            const subLabel = document.getElementById('pie-sub-label');
+            if (subLabel) {
+                if (window.pieFilterSpan === '1d') subLabel.innerText = "※本日の記録(24時間中)を表示";
+                else if (window.pieFilterSpan === '1w') subLabel.innerText = "※過去7日間の1日あたり平均時間を表示";
+                else if (window.pieFilterSpan === '1m') subLabel.innerText = "※過去30日間の1日あたり平均時間を表示";
+                else if (window.pieFilterSpan === '1y') subLabel.innerText = "※過去365日間の1日あたり平均時間を表示";
+            }
+
+            const cutoffDate = new Date(new Date().setDate(now.getDate() - daysLimit)).toISOString().split('T')[0];
+            const records = window.dbData.records.filter(r => r.date >= cutoffDate);
+            const allCats = [...baseCats, ...(window.dbData.cats || [])];
+
+            const timeCats = allCats.filter(c => c.type === 'time' || c.type === 'sleep' || c.id === 'run' || c.id === 'exercise');
+            
+            const labels = [];
+            const dataVals = [];
+            const bgColors = [];
+            let totalAvgRecordedHours = 0;
+
+            timeCats.forEach(c => {
+                const cRecs = records.filter(r => r.catId === c.id || r.catName === c.name);
+                let cTotalHours = 0;
+                cRecs.forEach(r => {
+                    cTotalHours += (r.durationMin || (r.val * 60) || 0) / 60;
+                });
+
+                // 🌟 各期間の1日あたり平均時間
+                const avgDailyHours = cTotalHours / daysLimit;
+
+                if (avgDailyHours > 0) {
+                    labels.push(c.name);
+                    dataVals.push(parseFloat(avgDailyHours.toFixed(1)));
+                    bgColors.push(c.color || '#0071e3');
+                    totalAvgRecordedHours += avgDailyHours;
+                }
+            });
+
+            const unrecordedHours = Math.max(0, 24 - totalAvgRecordedHours);
+            labels.push('未記入');
+            dataVals.push(parseFloat(unrecordedHours.toFixed(1)));
+            bgColors.push('#e5e5ea');
+
+            if (window.pieChartInstance) window.pieChartInstance.destroy();
+
+            window.pieChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataVals,
+                        backgroundColor: bgColors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '70%'
+                }
+            });
+        };
+
+        // 🌟 ご要望通り 棒グラフ（1週間:7本 / 1ヶ月:週別 / 半年:6本）を描画
+        window.setBarSpan = function(span) {
+            window.barFilterSpan = span;
+            ['1w','1m','6m'].forEach(s => {
+                const btn = document.getElementById(`bar-s-${s}`);
+                if (btn) btn.classList.toggle('active', s === span);
+            });
+            window.renderProfileBarChart();
+        };
+
+        window.slideBarCat = function(dir) {
+            const allCats = [...baseCats, ...(window.dbData.cats || [])].filter(c => c.type !== 'todo');
+            window.barCatIndex = (window.barCatIndex + dir + allCats.length) % allCats.length;
+            window.renderProfileBarChart();
+        };
+
+        window.renderProfileBarChart = function() {
+            const canvas = document.getElementById('profile-bar-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const allCats = [...baseCats, ...(window.dbData.cats || [])].filter(c => c.type !== 'todo');
+            if (allCats.length === 0) return;
+
+            const selectedCat = allCats[window.barCatIndex % allCats.length];
+            const titleElem = document.getElementById('bar-cat-title');
+            if (titleElem) titleElem.innerText = `${selectedCat.name} の推移 (${selectedCat.unit})`;
+
+            const labels = [];
+            const dataVals = [];
+            const today = new Date();
+
+            if (window.barFilterSpan === '1w') {
+                // 🌟 1週間: 7日分の棒（7本）
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(today.getDate() - i);
+                    const dStr = d.toISOString().split('T')[0];
+                    labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+
+                    const recs = window.dbData.records.filter(r => r.date === dStr && (r.catId === selectedCat.id || r.catName === selectedCat.name));
+                    const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
+                    dataVals.push(parseFloat(sum.toFixed(1)));
+                }
+            } else if (window.barFilterSpan === '1m') {
+                // 🌟 1ヶ月: 週ごとの棒（1週目〜4/5週目）
+                const year = today.getFullYear();
+                const month = today.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+
+                let weekIndex = 1;
+                let currentStart = new Date(firstDay);
+
+                while (currentStart <= lastDay) {
+                    const currentEnd = new Date(currentStart);
+                    currentEnd.setDate(currentStart.getDate() + 6);
+                    if (currentEnd > lastDay) currentEnd.setTime(lastDay.getTime());
+
+                    const startDateStr = currentStart.toISOString().split('T')[0];
+                    const endDateStr = currentEnd.toISOString().split('T')[0];
+
+                    labels.push(`${weekIndex}週目`);
+
+                    const recs = window.dbData.records.filter(r => r.date >= startDateStr && r.date <= endDateStr && (r.catId === selectedCat.id || r.catName === selectedCat.name));
+                    const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
+                    dataVals.push(parseFloat(sum.toFixed(1)));
+
+                    currentStart.setDate(currentStart.getDate() + 7);
+                    weekIndex++;
+                }
+            } else if (window.barFilterSpan === '6m') {
+                // 🌟 半年: 6ヶ月分の棒（6本）
+                for (let i = 5; i >= 0; i--) {
+                    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                    const yr = d.getFullYear();
+                    const mo = String(d.getMonth() + 1).padStart(2, '0');
+                    labels.push(`${d.getMonth()+1}月`);
+
+                    const recs = window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && (r.catId === selectedCat.id || r.catName === selectedCat.name));
+                    const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
+                    dataVals.push(parseFloat(sum.toFixed(1)));
+                }
+            }
+
+            if (window.barChartInstance) window.barChartInstance.destroy();
+
+            window.barChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataVals,
+                        backgroundColor: selectedCat.color || '#0071e3',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+                        y: { grid: { color: 'rgba(120,120,120,0.1)' }, ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
         };
 
         window.updateRankList = async function(id) {
