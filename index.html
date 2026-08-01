@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.19</title>
+    <title>Satoz Diary Ver. α.20</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -37,7 +37,7 @@
         .todo-checked { opacity: 0.4; text-decoration: line-through; }
         .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
         .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
-        .dial-select { font-size: 14px; font-weight: bold; padding: 8px 12px; text-align: center; background: rgba(120,120,120,0.15); border-radius: 12px; }
+        .dial-select { font-size: 14px; font-weight: bold; padding: 8px 10px; text-align: center; background: rgba(120,120,120,0.15); border-radius: 12px; }
     </style>
 
     <script>
@@ -171,7 +171,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.19</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.20</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -196,7 +196,7 @@
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
                 <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.19</span>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.20</span>
             </div>
             
             <div class="flex items-center gap-2">
@@ -215,8 +215,10 @@
 
         <main class="max-w-md mx-auto px-4">
             
-            <!-- Home (記録・予定管理) -->
+            <!-- Home (Records) -->
             <section id="home" class="view-section active">
+                <h2 class="text-2xl font-black mb-2 italic tracking-tight">Records</h2>
+                
                 <div class="glass-card p-4 mb-6 border-l-6 border-yellow-400 shadow-sm">
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="font-bold text-xs text-gray-500 uppercase tracking-wider">スケジュール・予定</h2>
@@ -274,7 +276,7 @@
             <!-- Timeline (広場) -->
             <section id="timeline" class="view-section">
                 <div class="mb-4">
-                    <h2 class="text-xl font-black mb-2 italic">Timeline</h2>
+                    <h2 class="text-2xl font-black mb-2 italic tracking-tight">Timeline</h2>
                     <div id="tl-demo-warning" class="hidden mb-3 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 rounded-xl text-[10px] font-bold text-amber-700 dark:text-amber-300">
                         ⚠️ デモモードで実行中です。オンライン保存・共有機能はありません（端末内保存のみ）。
                     </div>
@@ -286,11 +288,10 @@
             <!-- Results -->
             <section id="results" class="view-section">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-black italic">Results</h2>
+                    <h2 class="text-2xl font-black italic tracking-tight">Results</h2>
                     <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="window.renderResultsView()">
                 </div>
 
-                <!-- 🌟 新機能：本日のカロリー収支 比較ビジュアルグラフ -->
                 <div id="calorie-balance-card" class="glass-card p-4 mb-4 border-2 border-orange-500/20 bg-orange-500/5">
                     <div class="flex justify-between items-center mb-2">
                         <div>
@@ -303,7 +304,6 @@
                             <p id="cal-bmr-disp">基礎代謝: 0 kcal</p>
                         </div>
                     </div>
-                    <!-- カロリー収支グラフ -->
                     <div class="w-full h-36 mt-2 pt-2 border-t border-orange-200/50">
                         <canvas id="results-calorie-chart"></canvas>
                     </div>
@@ -328,7 +328,7 @@
             <!-- Rankings -->
             <section id="ranking" class="view-section">
                 <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-xl font-black italic">Rankings</h2>
+                    <h2 class="text-2xl font-black italic tracking-tight">Rankings</h2>
                     <input type="date" id="rank-date" class="w-28 text-[10px]" onchange="window.updateRankList(window.rankCatId)">
                 </div>
                 
@@ -340,8 +340,9 @@
                 </div>
             </section>
 
-            <!-- Profile (本人 ＆ 24時間円グラフ ＆ 種別積み上げ棒グラフ) -->
+            <!-- Profile (本人 ＆ ポイント表示) -->
             <section id="profile" class="view-section">
+                <h2 class="text-2xl font-black mb-4 italic tracking-tight">Profile</h2>
                 <div id="profile-header-area"></div>
 
                 <!-- 24時間 1日あたり平均活用時間 円グラフ -->
@@ -366,7 +367,7 @@
                     </div>
                 </div>
 
-                <!-- 🌟 新機能：カテゴリー別 種別積み上げ棒グラフ（色の説明ラベル付き） -->
+                <!-- 種別積み上げ棒グラフ（色の説明ラベル付き） -->
                 <div class="glass-card p-5 mb-6 space-y-4">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2">
@@ -446,7 +447,7 @@
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="text-[10px] font-bold text-gray-400 uppercase">体重(kg)</label>
-                            <input type="number" id="set-weight" class="w-full mt-1">
+                            <input type="number" step="0.01" id="set-weight" class="w-full mt-1">
                             <p class="text-[8px] text-blue-500 font-bold mt-0.5">※最新日時で自動連動</p>
                         </div>
                         <div>
@@ -501,13 +502,14 @@
 
         const localDb = JSON.parse(localStorage.getItem('sz_v11_db') || '{}');
         window.dbData = {
-            user: Object.assign({ name: "Guest", id: "user_" + Date.now(), weight: 65, height: 170, age: 20, birthdate: "2004-01-01", avatar: null, groups: [] }, localDb.user || {}),
+            user: Object.assign({ name: "Guest", id: "user_" + Date.now(), weight: 65.0, height: 170, age: 20, birthdate: "2004-01-01", avatar: null, points: 0, lastAwardDate: null, groups: [] }, localDb.user || {}),
             records: Array.isArray(localDb.records) ? localDb.records : [],
             todos: Array.isArray(localDb.todos) ? localDb.todos : [],
             cats: Array.isArray(localDb.cats) ? localDb.cats : [],
             notifications: Array.isArray(localDb.notifications) ? localDb.notifications : []
         };
         window.dbData.user.groups = window.dbData.user.groups || [];
+        window.dbData.user.points = window.dbData.user.points || 0;
 
         window.allPosts = [];
         window.currentTLFilter = 'global';
@@ -806,7 +808,7 @@
             const u = window.dbData.user;
             if (document.getElementById('set-name')) document.getElementById('set-name').value = u.name || '';
             if (document.getElementById('set-id')) document.getElementById('set-id').value = u.id || '';
-            if (document.getElementById('set-weight')) document.getElementById('set-weight').value = u.weight || 65;
+            if (document.getElementById('set-weight')) document.getElementById('set-weight').value = u.weight || 65.0;
             if (document.getElementById('set-height')) document.getElementById('set-height').value = u.height || 170;
             if (document.getElementById('set-birthdate')) document.getElementById('set-birthdate').value = u.birthdate || '2004-01-01';
             
@@ -824,6 +826,7 @@
                 if (warn) warn.classList.remove('hidden');
             }
 
+            window.checkDailyPointsAward();
             window.renderIconPicker();
             window.renderCategories();
             window.renderAll();
@@ -838,6 +841,40 @@
                     const clock = document.getElementById('realtime-clock');
                     if (clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
                 }, 1000);
+            }
+        };
+
+        // 🌟 ランキング獲得ポイントの判定＆自動付与機能
+        window.checkDailyPointsAward = function() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const u = window.dbData.user;
+            if (u.lastAwardDate === todayStr) return;
+
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yestStr = yesterday.toISOString().split('T')[0];
+
+            const allCats = [...baseCats, ...(window.dbData.cats || [])];
+            let totalAwarded = 0;
+
+            allCats.forEach(c => {
+                const recs = window.dbData.records.filter(r => r.date === yestStr && (r.catId === c.id || r.catName === c.name));
+                if (recs.length > 0) {
+                    let pts = { p1: 10, p2: 5, p3: 2 };
+                    if (c.id === 'study') pts = { p1: 40, p2: 20, p3: 10 };
+                    else if (c.id === 'run' || c.id === 'exercise') pts = { p1: 30, p2: 15, p3: 5 };
+                    else if (c.id === 'weight') pts = { p1: 20, p2: 10, p3: 5 };
+                    else if (c.isCustom) pts = { p1: 3, p2: 2, p3: 1 };
+
+                    totalAwarded += pts.p1;
+                }
+            });
+
+            if (totalAwarded > 0) {
+                u.points = (u.points || 0) + totalAwarded;
+                u.lastAwardDate = todayStr;
+                window.saveLocal();
+                alert(`🎉 昨日のランキングインセンティブ獲得！\n⭐ +${totalAwarded} ポイントを獲得しました！ (現在の総ポイント: ${u.points} pt)`);
             }
         };
 
@@ -859,6 +896,7 @@
             window.renderAll();
         };
 
+        // 🛠️ 完全復旧＆エラー根絶済みの記録モーダル
         window.openInput = function(id) {
             window.currentCatId = id;
             window.clearRecPhoto();
@@ -905,12 +943,14 @@
                     </div>
                 `;
             } else if (id === 'weight') {
+                // 🌟 体重：小数点第2位まで精密ダイヤル対応
                 fields.innerHTML += `
-                    <label class="text-[10px] font-bold text-gray-400 uppercase">体重</label>
-                    <div class="flex gap-2 items-center justify-center">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase">体重 (小数点第2位まで)</label>
+                    <div class="flex gap-1.5 items-center justify-center">
                         <select id="v_weight_int" class="dial-select flex-1">${window.buildOptions(0, 999)}</select>
                         <span class="font-bold text-lg">.</span>
-                        <select id="v_weight_dec" class="dial-select w-20">${window.buildOptions(0, 9)}</select>
+                        <select id="v_weight_d1" class="dial-select w-16">${window.buildOptions(0, 9)}</select>
+                        <select id="v_weight_d2" class="dial-select w-16">${window.buildOptions(0, 9)}</select>
                         <span class="font-bold text-xs text-gray-500">kg</span>
                     </div>
                     <div class="p-3 bg-black/5 dark:bg-white/5 rounded-xl space-y-2 border border-black/10 dark:border-white/10">
@@ -927,8 +967,15 @@
                     </div>
                 `;
                 setTimeout(() => {
-                    const intSel = document.getElementById('v_weight_int');
-                    if (intSel) intSel.value = Math.floor(window.dbData.user.weight || 65);
+                    const currentW = window.dbData.user.weight || 65.0;
+                    const wInt = Math.floor(currentW);
+                    const decimals = Math.round((currentW - wInt) * 100);
+                    const d1 = Math.floor(decimals / 10);
+                    const d2 = decimals % 10;
+
+                    if (document.getElementById('v_weight_int')) document.getElementById('v_weight_int').value = wInt;
+                    if (document.getElementById('v_weight_d1')) document.getElementById('v_weight_d1').value = d1;
+                    if (document.getElementById('v_weight_d2')) document.getElementById('v_weight_d2').value = d2;
                 }, 50);
             } else if (id === 'run') {
                 fields.innerHTML += `
@@ -1017,9 +1064,11 @@
                 window.dbData.todos.push({ id: Date.now(), time: exactTime, task, memo, done: false, date: targetDate, photo: window.currentRecPhotoData });
             } else {
                 if (window.currentCatId === 'weight') {
+                    // 🌟 体重：整数 ＋ 小数第1位 ＋ 小数第2位
                     const wInt = parseFloat(document.getElementById('v_weight_int')?.value || 0);
-                    const wDec = parseFloat(document.getElementById('v_weight_dec')?.value || 0);
-                    val = wInt + (wDec / 10);
+                    const wD1 = parseFloat(document.getElementById('v_weight_d1')?.value || 0);
+                    const wD2 = parseFloat(document.getElementById('v_weight_d2')?.value || 0);
+                    val = wInt + (wD1 / 10) + (wD2 / 100);
 
                     const hasDetail = document.getElementById('weight-detail-check')?.checked;
                     if (hasDetail) {
@@ -1031,6 +1080,7 @@
                         };
                     }
 
+                    // 🌟 最新日時比較での確定連動
                     const currentDateTimeStr = `${date}T${time}`;
                     const currentTs = new Date(currentDateTimeStr).getTime();
                     const existingWeightRecords = window.dbData.records.filter(r => r.catId === 'weight');
@@ -1041,9 +1091,9 @@
                     });
                     
                     if (isLatestDateTime) {
-                        window.dbData.user.weight = val;
+                        window.dbData.user.weight = parseFloat(val.toFixed(2));
                         const setW = document.getElementById('set-weight');
-                        if (setW) setW.value = val;
+                        if (setW) setW.value = parseFloat(val.toFixed(2));
                     }
 
                     window.dbData.records = window.dbData.records.filter(r => !(r.date === date && r.time === time && r.catId === 'weight'));
@@ -1069,7 +1119,7 @@
                     val = parseFloat(document.getElementById('v1')?.value || 0);
                 }
 
-                let mainValStr = `${val.toFixed(1)} ${cat ? cat.unit : ''}`;
+                let mainValStr = `${val.toFixed(2)} ${cat ? cat.unit : ''}`;
                 if (window.currentCatId === 'run') {
                     mainValStr = `${val.toFixed(1)} km (${window.formatTimeShort(durationMin)})`;
                 } else if (window.currentCatId === 'diary') {
@@ -1521,7 +1571,6 @@
             alert(`グループ「${groupName}」から脱退しました。`);
         };
 
-        // 🌟 Resultsタブ描画 ＆ 本日のカロリー収支ビジュアルグラフ
         window.renderResultsView = function() {
             const date = document.getElementById('results-date').value;
             const all = [...baseCats, ...(window.dbData.cats || [])];
@@ -1558,7 +1607,6 @@
                 document.getElementById('cal-bmr-disp').innerText = `基礎代謝: ${bmr} kcal`;
             }
 
-            // 🌟 本日カロリー収支ビジュアルグラフを描画
             window.renderResultsCalorieChart(mealSum, burnSum, bmr, netCal);
 
             const grid = document.getElementById('result-sum-grid');
@@ -1588,10 +1636,10 @@
                     } else if (c.type === 'diary') {
                         valDisp = `${cur}文字`;
                     } else {
-                        valDisp = `${cur.toFixed(1)} ${c.unit}`;
+                        valDisp = `${cur.toFixed(2)} ${c.unit}`;
                     }
 
-                    const diffH = (cur === 0 || old === 0) ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(1)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(1)}</span>` : '±0');
+                    const diffH = (cur === 0 || old === 0) ? '' : (diff > 0 ? `<span class="diff-plus">+${diff.toFixed(2)}</span>` : diff < 0 ? `<span class="diff-minus">${diff.toFixed(2)}</span>` : '±0');
                     
                     return cur > 0 ? `
                         <div class="glass-card p-3 text-center">
@@ -1629,7 +1677,6 @@
             }
         };
 
-        // 🌟 本日カロリー収支 比較グラフ描画関数
         window.renderResultsCalorieChart = function(intake, burn, bmr, net) {
             const canvas = document.getElementById('results-calorie-chart');
             if (!canvas) return;
@@ -1644,10 +1691,10 @@
                     datasets: [{
                         data: [intake, burn, bmr, net],
                         backgroundColor: [
-                            '#ff9500', // 食事
-                            '#ff3b30', // 運動
-                            '#af52de', // 基礎代謝
-                            net > 0 ? '#ff3b30' : '#34c759' // プラス＝赤 / マイナス＝緑
+                            '#ff9500',
+                            '#ff3b30',
+                            '#af52de',
+                            net > 0 ? '#ff3b30' : '#34c759'
                         ],
                         borderRadius: 8
                     }]
@@ -1757,7 +1804,7 @@
             if (window.tempSelectedAvatar) {
                 window.dbData.user.avatar = window.tempSelectedAvatar;
             }
-            window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65);
+            window.dbData.user.weight = parseFloat(document.getElementById('set-weight').value || 65.0);
             window.dbData.user.height = parseFloat(document.getElementById('set-height').value || 170);
             
             window.saveLocal();
@@ -1772,15 +1819,21 @@
             alert("保存しました！\n（Satoz Diaryのアカウント設定をFirebaseへ正常に同期・更新しました）");
         };
 
+        // 🌟 本人（Profile）画面と保有ポイント表示
         window.renderProfilePage = function() {
             const u = window.dbData.user;
             const area = document.getElementById('profile-header-area');
             if (area) {
                 area.innerHTML = `
-                    <div class="glass-card p-6 mb-6 flex flex-col items-center text-center">
+                    <div class="glass-card p-6 mb-6 flex flex-col items-center text-center relative">
                         <img src="${u.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.name)}" class="w-28 h-28 rounded-full border-4 border-white shadow-xl object-cover">
                         <h2 class="text-xl font-black mt-4">${u.name}</h2>
                         <p class="text-[10px] text-gray-400 font-mono">ID: ${u.id}</p>
+
+                        <div class="mt-3 px-4 py-1.5 bg-yellow-400/20 text-yellow-600 dark:text-yellow-400 rounded-full font-black text-xs border border-yellow-400/30 flex items-center gap-1.5 shadow-sm">
+                            <i class="bi bi-star-fill text-yellow-500"></i>
+                            <span>${u.points || 0} pt (デイリー獲得分)</span>
+                        </div>
                     </div>`;
             }
 
@@ -1904,7 +1957,6 @@
             window.renderProfileBarChart();
         };
 
-        // 🌟 ご要望通り 種目・教科ごとの積み上げ棒グラフ（Stacked Bar Chart）＆色の説明（凡例）
         window.renderProfileBarChart = function() {
             const canvas = document.getElementById('profile-bar-chart');
             if (!canvas) return;
@@ -1920,7 +1972,6 @@
             const labels = [];
             const today = new Date();
 
-            // ラベル（X軸）の決定
             if (window.barFilterSpan === '1w') {
                 for (let i = 6; i >= 0; i--) {
                     const d = new Date();
@@ -1951,7 +2002,6 @@
             let datasets = [];
 
             if (subOpts.length > 0) {
-                // 種目・教科別 積み上げ棒データ作成
                 datasets = subOpts.map(subName => {
                     const color = subCategoryColors[subName] || selectedCat.color || '#0071e3';
                     const dataVals = labels.map((lbl, idx) => {
@@ -1979,7 +2029,7 @@
                             recs = window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && (r.catId === selectedCat.id || r.catName === selectedCat.name) && (r.subCategory === subName || (!r.subCategory && subName === 'その他')));
                         }
                         const sum = recs.reduce((s, a) => s + (a.val || 0), 0);
-                        return parseFloat(sum.toFixed(1));
+                        return parseFloat(sum.toFixed(2));
                     });
 
                     return {
@@ -1990,7 +2040,6 @@
                     };
                 });
             } else {
-                // 通常単一棒データ作成
                 const dataVals = labels.map((lbl, idx) => {
                     let recs = [];
                     if (window.barFilterSpan === '1w') {
@@ -2016,7 +2065,7 @@
                         recs = window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && (r.catId === selectedCat.id || r.catName === selectedCat.name));
                     }
                     const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
-                    return parseFloat(sum.toFixed(1));
+                    return parseFloat(sum.toFixed(2));
                 });
 
                 datasets = [{
@@ -2039,7 +2088,6 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { 
-                        // 🌟 色の説明ラベル（凡例）を表示
                         legend: { 
                             display: subOpts.length > 0,
                             position: 'top',
@@ -2156,9 +2204,9 @@
 
                         let valFormatted = '';
                         if (item.isWeightDiff) {
-                            valFormatted = item.val < 0 ? `<span class="diff-minus">${item.val.toFixed(1)} kg</span>` : item.val > 0 ? `<span class="diff-plus">+${item.val.toFixed(1)} kg</span>` : `±0.0 kg`;
+                            valFormatted = item.val < 0 ? `<span class="diff-minus">${item.val.toFixed(2)} kg</span>` : item.val > 0 ? `<span class="diff-plus">+${item.val.toFixed(2)} kg</span>` : `±0.00 kg`;
                         } else {
-                            valFormatted = `${item.val.toFixed(1)} ${unitStr}`;
+                            valFormatted = `${item.val.toFixed(2)} ${unitStr}`;
                             if (selectedCat && (selectedCat.type === 'time' || selectedCat.type === 'sleep')) {
                                 valFormatted = window.formatTime(item.val);
                             } else if (selectedCat && selectedCat.type === 'diary') {
@@ -2247,6 +2295,7 @@
                             window.dbData = { ...window.dbData, ...cloudData };
                             window.dbData.user.groups = window.dbData.user.groups || [];
                             window.dbData.notifications = window.dbData.notifications || [];
+                            window.dbData.user.points = window.dbData.user.points || 0;
                             window.saveLocal();
                             window.initApp();
                         }
