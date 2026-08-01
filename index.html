@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.20</title>
+    <title>Satoz Diary Ver. α.21</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -23,8 +23,8 @@
         body { background-color: var(--apple-bg); color: var(--apple-text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-bottom: 110px; transition: 0.3s; overflow-x: hidden; }
         .glass-card { background: var(--apple-card); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); border-radius: 22px; border: 1px solid rgba(120, 120, 120, 0.1); }
         .view-section { display: none; }
-        .view-section.active { display: block; animation: slideUp 0.4s ease-out; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .view-section.active { display: block; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
         .modal-pop { animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
         .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 85px; background: var(--apple-card); backdrop-filter: blur(25px); border-top: 0.5px solid rgba(120,120,120,0.2); display: flex; align-items: center; z-index: 9999; }
@@ -38,6 +38,8 @@
         .diff-plus { color: #34c759; font-weight: bold; font-size: 10px; }
         .diff-minus { color: #ff3b30; font-weight: bold; font-size: 10px; }
         .dial-select { font-size: 14px; font-weight: bold; padding: 8px 10px; text-align: center; background: rgba(120,120,120,0.15); border-radius: 12px; }
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #0071e3; width: 32px; height: 32px; animation: spin 0.8s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 
     <script>
@@ -48,11 +50,6 @@
             document.getElementById('app-shell').style.display = 'block';
             if (window.initApp) {
                 window.initApp();
-            } else {
-                document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-                const lastTab = localStorage.getItem('sz_active_tab') || 'home';
-                const target = document.getElementById(lastTab) || document.getElementById('home');
-                if (target) target.classList.add('active');
             }
         };
 
@@ -69,12 +66,13 @@
 </head>
 <body>
 
-    <!-- Safari Pull-to-refresh チラつき防止 & タブ事前動的同期 -->
+    <!-- 🌀 リロード・Pull-to-refresh 時の画面一瞬戻りチラつき全遮断 ＆ 即時指定タブ描画 -->
     <script>
         (function() {
             try {
                 const localDb = JSON.parse(localStorage.getItem('sz_v11_db') || '{}');
-                let style = '';
+                const lastTab = localStorage.getItem('sz_active_tab') || 'home';
+                let style = `.view-section{display:none !important;} #${lastTab}{display:block !important;}`;
                 if (localDb.user && localDb.user.id) {
                     style += '#login-screen{display:none !important;} #app-shell{display:block !important;}';
                 }
@@ -82,6 +80,36 @@
             } catch(e) {}
         })();
     </script>
+
+    <!-- ぐるぐるマーク (ローディング表示) -->
+    <div id="loading-overlay" class="fixed inset-0 z-[30000] bg-white/70 dark:bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center hidden">
+        <div class="spinner mb-2"></div>
+        <p class="text-xs font-bold text-blue-600 dark:text-blue-400">読み込み中...</p>
+    </div>
+
+    <!-- カロリー収支 推移グラフモーダル -->
+    <div id="cal-history-modal" class="fixed inset-0 z-[26000] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-card modal-pop p-5 max-w-sm w-full shadow-2xl relative max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-black/10 dark:border-white/10">
+                <h3 class="font-bold text-sm text-orange-500 flex items-center gap-1.5">
+                    <i class="bi bi-fire"></i>
+                    <span>カロリー収支 推移グラフ</span>
+                </h3>
+                <button onclick="document.getElementById('cal-history-modal').classList.add('hidden')" class="text-xs font-bold text-gray-400">閉じる</button>
+            </div>
+            
+            <div class="flex justify-center gap-1 mb-3">
+                <button onclick="window.setCalHistorySpan('1d')" id="cal-h-1d" class="chip py-1 px-2.5 text-[9px] active">1日</button>
+                <button onclick="window.setCalHistorySpan('1w')" id="cal-h-1w" class="chip py-1 px-2.5 text-[9px]">1週間</button>
+                <button onclick="window.setCalHistorySpan('1m')" id="cal-h-1m" class="chip py-1 px-2.5 text-[9px]">1ヶ月</button>
+                <button onclick="window.setCalHistorySpan('6m')" id="cal-h-6m" class="chip py-1 px-2.5 text-[9px]">半年</button>
+            </div>
+
+            <div class="w-full h-56">
+                <canvas id="cal-history-chart"></canvas>
+            </div>
+        </div>
+    </div>
 
     <!-- 通知一覧モーダル -->
     <div id="notify-modal" class="fixed inset-0 z-[26000] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
@@ -127,7 +155,7 @@
         <button class="absolute top-6 right-6 text-white text-3xl font-bold cursor-pointer">×</button>
     </div>
 
-    <!-- 記録・予定入力モーダル -->
+    <!-- 🛠️ 100%確実に開く入力モーダル -->
     <div id="input-modal" class="fixed inset-0 z-[15000] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="glass-card modal-pop p-6 max-w-sm w-full shadow-2xl relative max-h-[90vh] overflow-y-auto border-2 border-blue-500/30">
             <div class="flex justify-between items-center mb-4">
@@ -171,7 +199,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.20</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.21</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -196,7 +224,7 @@
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
                 <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.20</span>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.21</span>
             </div>
             
             <div class="flex items-center gap-2">
@@ -216,7 +244,7 @@
         <main class="max-w-md mx-auto px-4">
             
             <!-- Home (Records) -->
-            <section id="home" class="view-section active">
+            <section id="home" class="view-section">
                 <h2 class="text-2xl font-black mb-2 italic tracking-tight">Records</h2>
                 
                 <div class="glass-card p-4 mb-6 border-l-6 border-yellow-400 shadow-sm">
@@ -292,18 +320,23 @@
                     <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="window.renderResultsView()">
                 </div>
 
-                <div id="calorie-balance-card" class="glass-card p-4 mb-4 border-2 border-orange-500/20 bg-orange-500/5">
+                <!-- 🌟 タップで推移モーダルが開く本日カロリー収支カード -->
+                <div id="calorie-balance-card" onclick="window.openCalHistoryModal()" class="glass-card p-4 mb-4 border-2 border-orange-500/20 bg-orange-500/5 cursor-pointer hover:border-orange-500/40 transition">
                     <div class="flex justify-between items-center mb-2">
                         <div>
-                            <p class="text-[10px] font-bold text-orange-500 uppercase tracking-widest">本日カロリー収支 (食事 － 運動 － 基礎代謝)</p>
+                            <p class="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1">
+                                <span>本日カロリー収支</span>
+                                <i class="bi bi-graph-up text-xs"></i>
+                            </p>
                             <p id="cal-balance-val" class="text-xl font-black text-orange-600">0 kcal</p>
                         </div>
                         <div class="text-right text-[9px] text-gray-400 font-bold space-y-0.5">
-                            <p id="cal-intake-disp">摂取: 0 kcal</p>
-                            <p id="cal-burn-disp">運動: 0 kcal</p>
-                            <p id="cal-bmr-disp">基礎代謝: 0 kcal</p>
+                            <p id="cal-intake-disp">摂取 (+): 0 kcal</p>
+                            <p id="cal-burn-disp">運動 (-): 0 kcal</p>
+                            <p id="cal-bmr-disp">基礎代謝 (-): 0 kcal</p>
                         </div>
                     </div>
+                    <!-- 正負を正確に描画するグラフ -->
                     <div class="w-full h-36 mt-2 pt-2 border-t border-orange-200/50">
                         <canvas id="results-calorie-chart"></canvas>
                     </div>
@@ -340,7 +373,7 @@
                 </div>
             </section>
 
-            <!-- Profile (本人 ＆ ポイント表示) -->
+            <!-- Profile -->
             <section id="profile" class="view-section">
                 <h2 class="text-2xl font-black mb-4 italic tracking-tight">Profile</h2>
                 <div id="profile-header-area"></div>
@@ -367,7 +400,7 @@
                     </div>
                 </div>
 
-                <!-- 種別積み上げ棒グラフ（色の説明ラベル付き） -->
+                <!-- 種別積み上げ棒グラフ -->
                 <div class="glass-card p-5 mb-6 space-y-4">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2">
@@ -401,7 +434,7 @@
                 </div>
             </section>
 
-            <!-- Settings (Satoz Diary アカウント設定) -->
+            <!-- Settings -->
             <section id="settings" class="view-section">
                 <h2 class="text-xl font-bold mb-4 text-center">Settings</h2>
                 
@@ -525,10 +558,12 @@
 
         window.pieFilterSpan = '1d';
         window.barFilterSpan = '1w';
+        window.calHistorySpan = '1w';
         window.barCatIndex = 0;
         window.pieChartInstance = null;
         window.barChartInstance = null;
         window.resultsCalorieChartInstance = null;
+        window.calHistoryChartInstance = null;
 
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444444', type:'weight', unit:'kg' },
@@ -805,6 +840,9 @@
         };
 
         window.initApp = function() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.classList.remove('hidden');
+
             const u = window.dbData.user;
             if (document.getElementById('set-name')) document.getElementById('set-name').value = u.name || '';
             if (document.getElementById('set-id')) document.getElementById('set-id').value = u.id || '';
@@ -842,9 +880,12 @@
                     if (clock) clock.innerText = new Date().toLocaleTimeString('ja-JP');
                 }, 1000);
             }
+
+            setTimeout(() => {
+                if (overlay) overlay.classList.add('hidden');
+            }, 300);
         };
 
-        // 🌟 ランキング獲得ポイントの判定＆自動付与機能
         window.checkDailyPointsAward = function() {
             const todayStr = new Date().toISOString().split('T')[0];
             const u = window.dbData.user;
@@ -896,7 +937,7 @@
             window.renderAll();
         };
 
-        // 🛠️ 完全復旧＆エラー根絶済みの記録モーダル
+        // 🛠️ Ver.α.15ベースの100%確実に動作する記録モーダル
         window.openInput = function(id) {
             window.currentCatId = id;
             window.clearRecPhoto();
@@ -943,7 +984,6 @@
                     </div>
                 `;
             } else if (id === 'weight') {
-                // 🌟 体重：小数点第2位まで精密ダイヤル対応
                 fields.innerHTML += `
                     <label class="text-[10px] font-bold text-gray-400 uppercase">体重 (小数点第2位まで)</label>
                     <div class="flex gap-1.5 items-center justify-center">
@@ -1064,7 +1104,6 @@
                 window.dbData.todos.push({ id: Date.now(), time: exactTime, task, memo, done: false, date: targetDate, photo: window.currentRecPhotoData });
             } else {
                 if (window.currentCatId === 'weight') {
-                    // 🌟 体重：整数 ＋ 小数第1位 ＋ 小数第2位
                     const wInt = parseFloat(document.getElementById('v_weight_int')?.value || 0);
                     const wD1 = parseFloat(document.getElementById('v_weight_d1')?.value || 0);
                     const wD2 = parseFloat(document.getElementById('v_weight_d2')?.value || 0);
@@ -1080,7 +1119,6 @@
                         };
                     }
 
-                    // 🌟 最新日時比較での確定連動
                     const currentDateTimeStr = `${date}T${time}`;
                     const currentTs = new Date(currentDateTimeStr).getTime();
                     const existingWeightRecords = window.dbData.records.filter(r => r.catId === 'weight');
@@ -1602,11 +1640,12 @@
             const calBalElem = document.getElementById('cal-balance-val');
             if (calBalElem) {
                 calBalElem.innerText = `${netCal > 0 ? '+' : ''}${netCal} kcal`;
-                document.getElementById('cal-intake-disp').innerText = `摂取: ${mealSum} kcal`;
-                document.getElementById('cal-burn-disp').innerText = `運動: ${burnSum} kcal`;
-                document.getElementById('cal-bmr-disp').innerText = `基礎代謝: ${bmr} kcal`;
+                document.getElementById('cal-intake-disp').innerText = `摂取 (+): ${mealSum} kcal`;
+                document.getElementById('cal-burn-disp').innerText = `運動 (-): ${burnSum} kcal`;
+                document.getElementById('cal-bmr-disp').innerText = `基礎代謝 (-): ${bmr} kcal`;
             }
 
+            // 🌟 運動・基礎代謝がマイナス方向に伸びる正負正確なグラフを描画
             window.renderResultsCalorieChart(mealSum, burnSum, bmr, netCal);
 
             const grid = document.getElementById('result-sum-grid');
@@ -1677,6 +1716,7 @@
             }
         };
 
+        // 🌟 正負（プラス・マイナス）を明確にした本日カロリーグラフ
         window.renderResultsCalorieChart = function(intake, burn, bmr, net) {
             const canvas = document.getElementById('results-calorie-chart');
             if (!canvas) return;
@@ -1687,14 +1727,14 @@
             window.resultsCalorieChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['食事 (摂取)', '運動 (消費)', '基礎代謝', '最終収支'],
+                    labels: ['食事 (+)', '運動 (-)', '基礎代謝 (-)', '最終収支'],
                     datasets: [{
-                        data: [intake, burn, bmr, net],
+                        data: [intake, -burn, -bmr, net],
                         backgroundColor: [
-                            '#ff9500',
-                            '#ff3b30',
-                            '#af52de',
-                            net > 0 ? '#ff3b30' : '#34c759'
+                            '#ff9500', // 食事: プラス
+                            '#ff3b30', // 運動: マイナス
+                            '#af52de', // 基礎代謝: マイナス
+                            net > 0 ? '#ff3b30' : '#34c759' // プラス＝赤 / マイナス＝緑
                         ],
                         borderRadius: 8
                     }]
@@ -1705,6 +1745,119 @@
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { grid: { display: false }, ticks: { font: { size: 9, weight: 'bold' } } },
+                        y: { grid: { color: 'rgba(120,120,120,0.1)' }, ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
+        };
+
+        // 🌟 本日カロリー収支カードタップ時の歴史推移モーダル
+        window.openCalHistoryModal = function() {
+            document.getElementById('cal-history-modal').classList.remove('hidden');
+            window.renderCalHistoryChart();
+        };
+
+        window.setCalHistorySpan = function(span) {
+            window.calHistorySpan = span;
+            ['1d','1w','1m','6m'].forEach(s => {
+                const btn = document.getElementById(`cal-h-${s}`);
+                if (btn) btn.classList.toggle('active', s === span);
+            });
+            window.renderCalHistoryChart();
+        };
+
+        window.renderCalHistoryChart = function() {
+            const canvas = document.getElementById('cal-history-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const labels = [];
+            const dataVals = [];
+            const today = new Date();
+            const u = window.dbData.user;
+            const w = u.weight || 65;
+            const h = u.height || 170;
+            const a = window.calcAgeFromBirthdate(u.birthdate || '2004-01-01');
+            const bmr = Math.round((10 * w) + (6.25 * h) - (5 * a) + 5);
+
+            if (window.calHistorySpan === '1d') {
+                labels.push('今日');
+                const dStr = today.toISOString().split('T')[0];
+                const meal = window.dbData.records.filter(r => r.date === dStr && r.catId === 'meal').reduce((s, a) => s + a.val, 0);
+                let burn = 0;
+                window.dbData.records.filter(r => r.date === dStr && (r.catId === 'exercise' || r.catId === 'run')).forEach(r => {
+                    let mets = r.catId === 'run' ? 8.3 : 5.0;
+                    burn += Math.round(mets * w * ((r.durationMin || (r.val * 60) || 0) / 60) * 1.05);
+                });
+                dataVals.push(meal - (burn + bmr));
+            } else if (window.calHistorySpan === '1w') {
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(today.getDate() - i);
+                    const dStr = d.toISOString().split('T')[0];
+                    labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+
+                    const meal = window.dbData.records.filter(r => r.date === dStr && r.catId === 'meal').reduce((s, a) => s + a.val, 0);
+                    let burn = 0;
+                    window.dbData.records.filter(r => r.date === dStr && (r.catId === 'exercise' || r.catId === 'run')).forEach(r => {
+                        let mets = r.catId === 'run' ? 8.3 : 5.0;
+                        burn += Math.round(mets * w * ((r.durationMin || (r.val * 60) || 0) / 60) * 1.05);
+                    });
+                    dataVals.push(meal - (burn + bmr));
+                }
+            } else if (window.calHistorySpan === '1m') {
+                for (let i = 29; i >= 0; i -= 3) {
+                    const d = new Date();
+                    d.setDate(today.getDate() - i);
+                    const dStr = d.toISOString().split('T')[0];
+                    labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+
+                    const meal = window.dbData.records.filter(r => r.date === dStr && r.catId === 'meal').reduce((s, a) => s + a.val, 0);
+                    let burn = 0;
+                    window.dbData.records.filter(r => r.date === dStr && (r.catId === 'exercise' || r.catId === 'run')).forEach(r => {
+                        let mets = r.catId === 'run' ? 8.3 : 5.0;
+                        burn += Math.round(mets * w * ((r.durationMin || (r.val * 60) || 0) / 60) * 1.05);
+                    });
+                    dataVals.push(meal - (burn + bmr));
+                }
+            } else if (window.calHistorySpan === '6m') {
+                for (let i = 5; i >= 0; i--) {
+                    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                    const yr = d.getFullYear();
+                    const mo = String(d.getMonth() + 1).padStart(2, '0');
+                    labels.push(`${d.getMonth()+1}月`);
+
+                    const meal = window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && r.catId === 'meal').reduce((s, a) => s + a.val, 0);
+                    let burn = 0;
+                    window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && (r.catId === 'exercise' || r.catId === 'run')).forEach(r => {
+                        let mets = r.catId === 'run' ? 8.3 : 5.0;
+                        burn += Math.round(mets * w * ((r.durationMin || (r.val * 60) || 0) / 60) * 1.05);
+                    });
+                    dataVals.push(meal - (burn + bmr));
+                }
+            }
+
+            if (window.calHistoryChartInstance) window.calHistoryChartInstance.destroy();
+
+            window.calHistoryChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'カロリー収支 (kcal)',
+                        data: dataVals,
+                        borderColor: '#ff9500',
+                        backgroundColor: 'rgba(255, 149, 0, 0.15)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
                         y: { grid: { color: 'rgba(120,120,120,0.1)' }, ticks: { font: { size: 9 } } }
                     }
                 }
@@ -1819,7 +1972,6 @@
             alert("保存しました！\n（Satoz Diaryのアカウント設定をFirebaseへ正常に同期・更新しました）");
         };
 
-        // 🌟 本人（Profile）画面と保有ポイント表示
         window.renderProfilePage = function() {
             const u = window.dbData.user;
             const area = document.getElementById('profile-header-area');
