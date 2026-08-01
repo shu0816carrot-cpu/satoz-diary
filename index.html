@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Satoz Diary Ver. α.18</title>
+    <title>Satoz Diary Ver. α.19</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
 
@@ -171,7 +171,7 @@
             <div id="icon-fallback" class="w-24 h-24 bg-blue-600/10 text-blue-600 rounded-3xl flex items-center justify-center mb-6 text-4xl font-black italic shadow-inner" style="display:none;">S</div>
 
             <h1 class="text-3xl font-black italic text-blue-600 mb-1">Satoz Diary</h1>
-            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.18</p>
+            <p class="text-xs font-bold text-blue-500 mb-6">Ver. α.19</p>
             
             <button id="google-login-btn" onclick="window.cloud.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition active:scale-95 mb-3">
                 <i class="bi bi-google text-lg"></i>
@@ -196,7 +196,7 @@
         <header class="p-5 flex justify-between items-center sticky top-0 z-50 bg-opacity-70 backdrop-blur-md">
             <div class="flex items-baseline gap-2 cursor-pointer" onclick="window.showSection('home')">
                 <h1 class="text-lg font-black italic text-blue-600 tracking-tighter">Satoz Diary</h1>
-                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.18</span>
+                <span class="text-xs font-extrabold text-gray-900 dark:text-gray-100">Ver. α.19</span>
             </div>
             
             <div class="flex items-center gap-2">
@@ -290,8 +290,9 @@
                     <input type="date" id="results-date" class="w-32 text-xs p-1" onchange="window.renderResultsView()">
                 </div>
 
+                <!-- 🌟 新機能：本日のカロリー収支 比較ビジュアルグラフ -->
                 <div id="calorie-balance-card" class="glass-card p-4 mb-4 border-2 border-orange-500/20 bg-orange-500/5">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center mb-2">
                         <div>
                             <p class="text-[10px] font-bold text-orange-500 uppercase tracking-widest">本日カロリー収支 (食事 － 運動 － 基礎代謝)</p>
                             <p id="cal-balance-val" class="text-xl font-black text-orange-600">0 kcal</p>
@@ -301,6 +302,10 @@
                             <p id="cal-burn-disp">運動: 0 kcal</p>
                             <p id="cal-bmr-disp">基礎代謝: 0 kcal</p>
                         </div>
+                    </div>
+                    <!-- カロリー収支グラフ -->
+                    <div class="w-full h-36 mt-2 pt-2 border-t border-orange-200/50">
+                        <canvas id="results-calorie-chart"></canvas>
                     </div>
                 </div>
 
@@ -335,11 +340,11 @@
                 </div>
             </section>
 
-            <!-- Profile (本人 ＆ 24時間円グラフ ＆ カテゴリー別棒グラフ) -->
+            <!-- Profile (本人 ＆ 24時間円グラフ ＆ 種別積み上げ棒グラフ) -->
             <section id="profile" class="view-section">
                 <div id="profile-header-area"></div>
 
-                <!-- 🌟 24時間 1日あたり平均活用時間 円グラフ -->
+                <!-- 24時間 1日あたり平均活用時間 円グラフ -->
                 <div class="glass-card p-5 mb-6 space-y-4">
                     <div class="flex justify-between items-center">
                         <div>
@@ -361,7 +366,7 @@
                     </div>
                 </div>
 
-                <!-- 🌟 カテゴリー別 棒グラフ（1週間:7本 / 1ヶ月:週別 / 半年:6本） -->
+                <!-- 🌟 新機能：カテゴリー別 種別積み上げ棒グラフ（色の説明ラベル付き） -->
                 <div class="glass-card p-5 mb-6 space-y-4">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2">
@@ -375,7 +380,7 @@
                             <button onclick="window.setBarSpan('6m')" id="bar-s-6m" class="chip py-1 px-2.5 text-[9px]">半年</button>
                         </div>
                     </div>
-                    <div class="w-full h-44">
+                    <div class="w-full h-48">
                         <canvas id="profile-bar-chart"></canvas>
                     </div>
                 </div>
@@ -521,6 +526,7 @@
         window.barCatIndex = 0;
         window.pieChartInstance = null;
         window.barChartInstance = null;
+        window.resultsCalorieChartInstance = null;
 
         const baseCats = [
             { id:'weight', name:'体重', icon:'bi-speedometer2', color:'#444444', type:'weight', unit:'kg' },
@@ -533,13 +539,19 @@
                 id:'exercise', name:'運動', icon:'bi-fire', color:'#ff9500', type:'time', unit:'時間', mets:5.0,
                 subOptions: ['腹筋', '背筋', '腕立て伏せ', 'プランク', '機械', 'その他'] 
             },
-            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3 },
+            { id:'run', name:'ランニング', icon:'bi-person-walking', color:'#ff3b30', type:'run', unit:'km', mets:8.3, subOptions: ['ランニング', 'ウォーキング', 'その他'] },
             { id:'diary', name:'日記', icon:'bi-chat-quote', color:'#000000', type:'diary', unit:'文字' },
             { id:'sleep', name:'睡眠', icon:'bi-moon-stars', color:'#af52de', type:'sleep', unit:'時間' }
         ];
 
         const presetIcons = ['bi-book', 'bi-fire', 'bi-person-walking', 'bi-speedometer2', 'bi-chat-quote', 'bi-moon-stars', 'bi-cup-hot', 'bi-heart-pulse', 'bi-controller', 'bi-music-note', 'bi-droplet', 'bi-capsule', 'bi-star-fill', 'bi-trophy', 'bi-bicycle'];
         let selectedIcon = presetIcons[0];
+
+        const subCategoryColors = {
+            '国語': '#ff3b30', '数学': '#0071e3', '物理': '#af52de', '化学': '#5856d6', '英語': '#ff9500', '情報': '#34c759',
+            '腹筋': '#ff9500', '背筋': '#ff3b30', '腕立て伏せ': '#af52de', 'プランク': '#34c759', '機械': '#0071e3',
+            'ランニング': '#ff3b30', 'ウォーキング': '#34c759', 'その他': '#8e8e93'
+        };
 
         window.calcAgeFromBirthdate = function(birthdateStr) {
             if (!birthdateStr) return 20;
@@ -1509,6 +1521,7 @@
             alert(`グループ「${groupName}」から脱退しました。`);
         };
 
+        // 🌟 Resultsタブ描画 ＆ 本日のカロリー収支ビジュアルグラフ
         window.renderResultsView = function() {
             const date = document.getElementById('results-date').value;
             const all = [...baseCats, ...(window.dbData.cats || [])];
@@ -1544,6 +1557,9 @@
                 document.getElementById('cal-burn-disp').innerText = `運動: ${burnSum} kcal`;
                 document.getElementById('cal-bmr-disp').innerText = `基礎代謝: ${bmr} kcal`;
             }
+
+            // 🌟 本日カロリー収支ビジュアルグラフを描画
+            window.renderResultsCalorieChart(mealSum, burnSum, bmr, netCal);
 
             const grid = document.getElementById('result-sum-grid');
             if (grid) {
@@ -1611,6 +1627,41 @@
                     diaryList.innerHTML = `<p class="text-center text-xs text-gray-400 py-2">本日の日記はありません</p>`;
                 }
             }
+        };
+
+        // 🌟 本日カロリー収支 比較グラフ描画関数
+        window.renderResultsCalorieChart = function(intake, burn, bmr, net) {
+            const canvas = document.getElementById('results-calorie-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            if (window.resultsCalorieChartInstance) window.resultsCalorieChartInstance.destroy();
+
+            window.resultsCalorieChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['食事 (摂取)', '運動 (消費)', '基礎代謝', '最終収支'],
+                    datasets: [{
+                        data: [intake, burn, bmr, net],
+                        backgroundColor: [
+                            '#ff9500', // 食事
+                            '#ff3b30', // 運動
+                            '#af52de', // 基礎代謝
+                            net > 0 ? '#ff3b30' : '#34c759' // プラス＝赤 / マイナス＝緑
+                        ],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 9, weight: 'bold' } } },
+                        y: { grid: { color: 'rgba(120,120,120,0.1)' }, ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
         };
 
         window.toggleTodo = function(id) {
@@ -1755,7 +1806,6 @@
             window.renderProfileBarChart();
         };
 
-        // 🌟 ご要望通り「1日あたりの平均時間（24時間構成）」で円グラフを描画
         window.setPieFilter = function(span) {
             window.pieFilterSpan = span;
             ['1d','1w','1m','1y'].forEach(s => {
@@ -1802,7 +1852,6 @@
                     cTotalHours += (r.durationMin || (r.val * 60) || 0) / 60;
                 });
 
-                // 🌟 各期間の1日あたり平均時間
                 const avgDailyHours = cTotalHours / daysLimit;
 
                 if (avgDailyHours > 0) {
@@ -1840,7 +1889,6 @@
             });
         };
 
-        // 🌟 ご要望通り 棒グラフ（1週間:7本 / 1ヶ月:週別 / 半年:6本）を描画
         window.setBarSpan = function(span) {
             window.barFilterSpan = span;
             ['1w','1m','6m'].forEach(s => {
@@ -1856,6 +1904,7 @@
             window.renderProfileBarChart();
         };
 
+        // 🌟 ご要望通り 種目・教科ごとの積み上げ棒グラフ（Stacked Bar Chart）＆色の説明（凡例）
         window.renderProfileBarChart = function() {
             const canvas = document.getElementById('profile-bar-chart');
             if (!canvas) return;
@@ -1869,23 +1918,16 @@
             if (titleElem) titleElem.innerText = `${selectedCat.name} の推移 (${selectedCat.unit})`;
 
             const labels = [];
-            const dataVals = [];
             const today = new Date();
 
+            // ラベル（X軸）の決定
             if (window.barFilterSpan === '1w') {
-                // 🌟 1週間: 7日分の棒（7本）
                 for (let i = 6; i >= 0; i--) {
                     const d = new Date();
                     d.setDate(today.getDate() - i);
-                    const dStr = d.toISOString().split('T')[0];
                     labels.push(`${d.getMonth()+1}/${d.getDate()}`);
-
-                    const recs = window.dbData.records.filter(r => r.date === dStr && (r.catId === selectedCat.id || r.catName === selectedCat.name));
-                    const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
-                    dataVals.push(parseFloat(sum.toFixed(1)));
                 }
             } else if (window.barFilterSpan === '1m') {
-                // 🌟 1ヶ月: 週ごとの棒（1週目〜4/5週目）
                 const year = today.getFullYear();
                 const month = today.getMonth();
                 const firstDay = new Date(year, month, 1);
@@ -1893,36 +1935,96 @@
 
                 let weekIndex = 1;
                 let currentStart = new Date(firstDay);
-
                 while (currentStart <= lastDay) {
-                    const currentEnd = new Date(currentStart);
-                    currentEnd.setDate(currentStart.getDate() + 6);
-                    if (currentEnd > lastDay) currentEnd.setTime(lastDay.getTime());
-
-                    const startDateStr = currentStart.toISOString().split('T')[0];
-                    const endDateStr = currentEnd.toISOString().split('T')[0];
-
                     labels.push(`${weekIndex}週目`);
-
-                    const recs = window.dbData.records.filter(r => r.date >= startDateStr && r.date <= endDateStr && (r.catId === selectedCat.id || r.catName === selectedCat.name));
-                    const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
-                    dataVals.push(parseFloat(sum.toFixed(1)));
-
                     currentStart.setDate(currentStart.getDate() + 7);
                     weekIndex++;
                 }
             } else if (window.barFilterSpan === '6m') {
-                // 🌟 半年: 6ヶ月分の棒（6本）
                 for (let i = 5; i >= 0; i--) {
                     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-                    const yr = d.getFullYear();
-                    const mo = String(d.getMonth() + 1).padStart(2, '0');
                     labels.push(`${d.getMonth()+1}月`);
-
-                    const recs = window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && (r.catId === selectedCat.id || r.catName === selectedCat.name));
-                    const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
-                    dataVals.push(parseFloat(sum.toFixed(1)));
                 }
+            }
+
+            const subOpts = selectedCat.subOptions || [];
+            let datasets = [];
+
+            if (subOpts.length > 0) {
+                // 種目・教科別 積み上げ棒データ作成
+                datasets = subOpts.map(subName => {
+                    const color = subCategoryColors[subName] || selectedCat.color || '#0071e3';
+                    const dataVals = labels.map((lbl, idx) => {
+                        let recs = [];
+                        if (window.barFilterSpan === '1w') {
+                            const d = new Date();
+                            d.setDate(today.getDate() - (6 - idx));
+                            const dStr = d.toISOString().split('T')[0];
+                            recs = window.dbData.records.filter(r => r.date === dStr && (r.catId === selectedCat.id || r.catName === selectedCat.name) && (r.subCategory === subName || (!r.subCategory && subName === 'その他')));
+                        } else if (window.barFilterSpan === '1m') {
+                            const year = today.getFullYear();
+                            const month = today.getMonth();
+                            const firstDay = new Date(year, month, 1);
+                            const start = new Date(firstDay);
+                            start.setDate(1 + idx * 7);
+                            const end = new Date(start);
+                            end.setDate(start.getDate() + 6);
+                            const sStr = start.toISOString().split('T')[0];
+                            const eStr = end.toISOString().split('T')[0];
+                            recs = window.dbData.records.filter(r => r.date >= sStr && r.date <= eStr && (r.catId === selectedCat.id || r.catName === selectedCat.name) && (r.subCategory === subName || (!r.subCategory && subName === 'その他')));
+                        } else if (window.barFilterSpan === '6m') {
+                            const d = new Date(today.getFullYear(), today.getMonth() - (5 - idx), 1);
+                            const yr = d.getFullYear();
+                            const mo = String(d.getMonth() + 1).padStart(2, '0');
+                            recs = window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && (r.catId === selectedCat.id || r.catName === selectedCat.name) && (r.subCategory === subName || (!r.subCategory && subName === 'その他')));
+                        }
+                        const sum = recs.reduce((s, a) => s + (a.val || 0), 0);
+                        return parseFloat(sum.toFixed(1));
+                    });
+
+                    return {
+                        label: subName,
+                        data: dataVals,
+                        backgroundColor: color,
+                        borderRadius: 4
+                    };
+                });
+            } else {
+                // 通常単一棒データ作成
+                const dataVals = labels.map((lbl, idx) => {
+                    let recs = [];
+                    if (window.barFilterSpan === '1w') {
+                        const d = new Date();
+                        d.setDate(today.getDate() - (6 - idx));
+                        const dStr = d.toISOString().split('T')[0];
+                        recs = window.dbData.records.filter(r => r.date === dStr && (r.catId === selectedCat.id || r.catName === selectedCat.name));
+                    } else if (window.barFilterSpan === '1m') {
+                        const year = today.getFullYear();
+                        const month = today.getMonth();
+                        const firstDay = new Date(year, month, 1);
+                        const start = new Date(firstDay);
+                        start.setDate(1 + idx * 7);
+                        const end = new Date(start);
+                        end.setDate(start.getDate() + 6);
+                        const sStr = start.toISOString().split('T')[0];
+                        const eStr = end.toISOString().split('T')[0];
+                        recs = window.dbData.records.filter(r => r.date >= sStr && r.date <= eStr && (r.catId === selectedCat.id || r.catName === selectedCat.name));
+                    } else if (window.barFilterSpan === '6m') {
+                        const d = new Date(today.getFullYear(), today.getMonth() - (5 - idx), 1);
+                        const yr = d.getFullYear();
+                        const mo = String(d.getMonth() + 1).padStart(2, '0');
+                        recs = window.dbData.records.filter(r => r.date.startsWith(`${yr}-${mo}`) && (r.catId === selectedCat.id || r.catName === selectedCat.name));
+                    }
+                    const sum = (selectedCat.id === 'weight') ? (recs[0]?.val || 0) : recs.reduce((s, a) => s + (a.val || 0), 0);
+                    return parseFloat(sum.toFixed(1));
+                });
+
+                datasets = [{
+                    label: selectedCat.name,
+                    data: dataVals,
+                    backgroundColor: selectedCat.color || '#0071e3',
+                    borderRadius: 6
+                }];
             }
 
             if (window.barChartInstance) window.barChartInstance.destroy();
@@ -1931,19 +2033,22 @@
                 type: 'bar',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        data: dataVals,
-                        backgroundColor: selectedCat.color || '#0071e3',
-                        borderRadius: 6
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: { 
+                        // 🌟 色の説明ラベル（凡例）を表示
+                        legend: { 
+                            display: subOpts.length > 0,
+                            position: 'top',
+                            labels: { font: { size: 9, weight: 'bold' }, boxWidth: 10 }
+                        }
+                    },
                     scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
-                        y: { grid: { color: 'rgba(120,120,120,0.1)' }, ticks: { font: { size: 9 } } }
+                        x: { stacked: subOpts.length > 0, grid: { display: false }, ticks: { font: { size: 9 } } },
+                        y: { stacked: subOpts.length > 0, grid: { color: 'rgba(120,120,120,0.1)' }, ticks: { font: { size: 9 } } }
                     }
                 }
             });
